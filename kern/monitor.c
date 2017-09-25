@@ -21,13 +21,25 @@ struct Command {
 	int (*func)(int argc, char** argv, struct Trapframe* tf);
 };
 
+int
+mon_test(int argc, char **argv, struct Trapframe *tf);
+
 static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
+	{ "test", "This is just test command", mon_test },
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
 /***** Implementations of basic kernel monitor commands *****/
+
+int
+mon_test(int argc, char **argv, struct Trapframe *tf)
+{
+	cprintf("Test Test Test\n");
+
+	return 0;
+}
 
 int
 mon_help(int argc, char **argv, struct Trapframe *tf)
@@ -62,7 +74,32 @@ mon_kerninfo(int argc, char **argv, struct Trapframe *tf)
 int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 {
-	// Your code here.
+	uint32_t *ebp = (uint32_t *) read_ebp();
+	cprintf("Stack backtrace:\n");
+
+	while(ebp) {
+		uint32_t eip = ebp[1];
+
+		cprintf("  ebp %08x", (uint32_t)ebp);
+		cprintf("  eip %08x", eip);
+
+		cprintf(" args");
+
+		int i;
+		for(i = 2; i <= 6; i++) {
+			cprintf(" %08x", ebp[i]);
+		}
+		cprintf("\n");
+
+		struct Eipdebuginfo info;
+		debuginfo_eip(eip, &info);
+		cprintf("\t%s:%d: %.*s+%d\n", 
+		    info.eip_file, info.eip_line,
+		    info.eip_fn_namelen, info.eip_fn_name,
+		    eip-info.eip_fn_addr);
+
+		ebp = (uint32_t*) *ebp;
+	}
 	return 0;
 }
 
