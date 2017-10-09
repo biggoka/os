@@ -129,6 +129,7 @@ trap_dispatch(struct Trapframe *tf)
 	// The hardware sometimes raises these because of noise on the
 	// IRQ line or other reasons. We don't care.
 	//
+	uint8_t status;
 	if (tf->tf_trapno == IRQ_OFFSET + IRQ_SPURIOUS) {
 		cprintf("Spurious interrupt on irq 7\n");
 		print_trapframe(tf);
@@ -136,6 +137,8 @@ trap_dispatch(struct Trapframe *tf)
 	}
 
 	if (tf->tf_trapno == IRQ_OFFSET + IRQ_CLOCK) {
+		status = rtc_check_status();
+		pic_send_eoi(IRQ_CLOCK);
 		sched_yield();
 		return;
 	}
