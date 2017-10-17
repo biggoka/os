@@ -7,7 +7,7 @@
 
 /* The clock frequency of the i8253/i8254 PIT */
 #define PIT_TICK_RATE 1193182ul
-#define DEFAULT_FREQ 2500000
+#define DEFAULT_FREQ 1700000
 #define TIMES 100
 
 unsigned long cpu_freq;
@@ -193,11 +193,35 @@ void print_timer_error(void)
 //Lab 5: You code here
 //Use print_time function to print timert result.
 //Use print_timer_error function to print error.
+
+bool timer_going = false;
+uint64_t time = 0;
+
 void timer_start(void)
 {
+	if (timer_going) {
+		print_timer_error();
+		time = read_tsc();
+	} else {
+		time = read_tsc();
+		timer_going = true;
+	}
 }
 
 void timer_stop(void)
 {
+
+	if (!timer_going) {
+		print_timer_error();
+		return;
+	}
+
+	uint64_t time_elapsed;
+	time_elapsed = (uint64_t)(read_tsc() - time);
+	time_elapsed = (uint64_t)(time_elapsed / cpu_freq / 1000);
+
+	print_time(time_elapsed);
+	timer_going = false;
+
 }
 

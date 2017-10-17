@@ -25,10 +25,21 @@ struct Command {
 int
 mon_test(int argc, char **argv, struct Trapframe *tf);
 
+int start(int argc, char **argv, struct Trapframe *tf) {
+	timer_start();
+	return 0;
+}
+int stop(int argc, char **argv, struct Trapframe *tf) {
+	timer_stop();
+	return 0;
+}
+
 static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
 	{ "test", "This is just test command", mon_test },
+	{ "timer_start", "Start timer", start },
+	{ "timer_stop", "stop timer", stop }
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
