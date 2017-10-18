@@ -210,7 +210,6 @@ void timer_start(void)
 
 void timer_stop(void)
 {
-
 	if (!timer_going) {
 		print_timer_error();
 		return;
