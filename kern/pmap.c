@@ -197,7 +197,23 @@ page_init(void)
 	// NB: DO NOT actually touch the physical memory corresponding to
 	// free pages!
 	size_t i;
-	for (i = 0; i < npages; i++) {
+	pages[0].pp_ref = 1;
+	for (i = 1; i < npages_basemem; i++) {
+		pages[i].pp_ref = 0;
+		pages[i].pp_link = page_free_list;
+		page_free_list = &pages[i];
+	}
+	for(i = npages_basemem; i < EXTPHYSMEM/PGSIZE; i++)
+	{
+		pages[i].pp_ref = 1;		
+	}
+	for(i = EXTPHYSMEM/PGSIZE; i < PGNUM(PADDR(boot_alloc(0))); i++)
+	{
+		pages[i].pp_ref = 1;
+	}
+
+	for (i = PGNUM(PADDR(boot_alloc(0))); i < npages; i++) 
+	{
 		pages[i].pp_ref = 0;
 		pages[i].pp_link = page_free_list;
 		page_free_list = &pages[i];
@@ -220,7 +236,16 @@ struct PageInfo *
 page_alloc(int alloc_flags)
 {
 	// Fill this function in
-	return 0;
+	struct PageInfo *tmp = page_free_list;
+	if (tmp == NULL) 
+		return NULL;
+	page_free_list = tmp->pp_link;
+	tmp->pp_link = NULL;
+	if (ALLOC_ZERO == alloc_flags) {
+		char *va = page2kva(tmp);
+		memset(va, 0, PGSIZE);
+	} 
+	return tmp;
 }
 
 //
@@ -233,6 +258,10 @@ page_free(struct PageInfo *pp)
 	// Fill this function in
 	// Hint: You may want to panic if pp->pp_ref is nonzero or
 	// pp->pp_link is not NULL.
+	if ((pp->pp_ref != 0) || (pp->pp_link != NULL))
+		panic("page_free: pp->pp_ref is nonzero or pp->pp_link is not NULL!");
+	pp->pp_link = page_free_list;
+	page_free_list = pp;
 }
 
 //

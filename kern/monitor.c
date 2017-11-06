@@ -35,12 +35,39 @@ int stop(int argc, char **argv, struct Trapframe *tf) {
 	return 0;
 }
 
+int list_pages(int argc, char **argv, struct Trapframe *tf) {
+	size_t i, last_alloc = 1;
+	int flag = 1, ref;
+	for(i = 0; i < npages; i++)
+	{
+		if(pages[i].pp_ref == 0)
+			ref = 0;
+		else
+			ref = 1;
+		if(ref != flag)
+		{
+			if(last_alloc != i) cprintf( "%d..%d ", last_alloc, i );		
+			else cprintf( "%d ", last_alloc );		
+			if(flag) cprintf("ALLOCATED\n");
+			else cprintf("FREE\n");
+			flag = ref;
+			last_alloc = i + 1;
+		}
+	}
+	if (last_alloc != npages) {
+		if (flag) cprintf("%d..%d ALLOCATED\n", last_alloc, npages);
+		else cprintf("%d..%d FREE\n", last_alloc, npages);
+	}
+	return 0;
+}
+
 static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
 	{ "test", "This is just test command", mon_test },
 	{ "timer_start", "Start timer", start },
-	{ "timer_stop", "stop timer", stop }
+	{ "timer_stop", "stop timer", stop },
+	{ "list_pages", "list pages", list_pages },
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
