@@ -178,6 +178,11 @@ mem_init(void)
 	//    - pages itself -- kernel RW, user NONE
 	// Your code goes here:
 
+	boot_map_region(kern_pgdir, UPAGES, npages * sizeof(struct PageInfo), PADDR(pages), PTE_U);
+	boot_map_region(kern_pgdir, (uintptr_t)pages, npages * sizeof(struct PageInfo), PADDR(pages), PTE_W);
+
+
+
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
 	// stack.  The kernel stack grows down from virtual address KSTACKTOP.
@@ -190,6 +195,8 @@ mem_init(void)
 	//     Permissions: kernel RW, user NONE
 	// Your code goes here:
 
+	boot_map_region(kern_pgdir, KSTACKTOP - KSTKSIZE, KSTKSIZE, PADDR(bootstack), PTE_W);
+
 	//////////////////////////////////////////////////////////////////////
 	// Map all of physical memory at KERNBASE.
 	// Ie.  the VA range [KERNBASE, 2^32) should map to
@@ -198,6 +205,8 @@ mem_init(void)
 	// we just set up the mapping anyway.
 	// Permissions: kernel RW, user NONE
 	// Your code goes here:
+
+	boot_map_region(kern_pgdir, KERNBASE, 0xFFFFFFF + 1, 0, PTE_W);
 
 	// Check that the initial page directory has been set up correctly.
 	check_kern_pgdir();
@@ -363,7 +372,39 @@ pte_t *
 pgdir_walk(pde_t *pgdir, const void *va, int create)
 {
 	// Fill this function in
-	return NULL;
+	struct PageInfo *page;
+	pte_t *page_table;
+	//С помощью PDX получаем иднекс страницы для  таблицы страниц
+	size_t page_dir_index = PDX(va);
+	pde_t page_dir_entry = pgdir[page_dir_index];
+	//P — Present, присутствие. Означает, что страница отображена и может использоваться при трансляции адреса.
+	//Поэтому здесь мы проверяем возможность этого использования
+	if (page_dir_entry & PTE_P) 
+	{
+		//Здесь получаем адрес таблицы страниц, адрес нужной нам структуры pte_t
+		//PTE_ADDR берет от адреса каталога страниц старшие 20 бит, то есть получает адрес таблицы страниц
+		page_table = KADDR(PTE_ADDR(page_dir_entry));
+		//KADDR переводит физический адрес в виртуальный
+	}
+	else 
+	{
+		//если при вызове create == false (т.е. запись не существует)
+		if (!create)
+			return NULL;
+		page = page_alloc(ALLOC_ZERO);
+		//нет памяти под выделение, тогда возвращаем NULL
+		if (!page)
+			return NULL;
+		//Увеличиваем счетчик ссылок на страницу
+		page->pp_ref++;
+		//с помощью page2pa() получаем физ. адрес нашей выделенной страницы и выставляем там нужные флаги
+		pgdir[page_dir_index] = page2pa(page) | PTE_U | PTE_W | PTE_P;
+		//в адресе таблицы страниц нам нужен виртуальный адрес страницы 
+		page_table = (pte_t *)page2kva(page);
+	}
+	//С помощью PTX получаем иднекс конкретной страницы 
+	size_t page_table_index = PTX(va);
+	return &page_table[page_table_index];
 }
 
 //
@@ -381,6 +422,15 @@ static void
 boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm)
 {
 	// Fill this function in
+	for (uint32_t i = 0; i < size; i += PGSIZE) 
+	{
+		//C помощью pgdir_walk() получаем запись pte_t из каталога страниц по адресу (va + i)
+
+		pte_t *page_table_entry = pgdir_walk(pgdir, (void *)va + i, true);
+
+		//Выставляем необъодимые флаги
+		*page_table_entry = (pa + i) | perm | PTE_P;
+	}
 }
 
 //
@@ -412,6 +462,26 @@ int
 page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 {
 	// Fill this function in
+	pte_t *pte = pgdir_walk(pgdir, va, 0);
+  	// Increment ref-count here so that we cannot accidentally free a page that's mapped again to the same virtual address
+  	pp->pp_ref++;
+
+	//   - If there is already a page mapped at 'va', it should be page_remove()d.
+	//   - The TLB must be invalidated if a page was formerly present at 'va'.
+	// The page table is recorded in the page directory, and the page is present
+  	if (pte && (*pte & PTE_P)) page_remove(pgdir, va);
+
+	//   - If necessary, on demand, a page table should be allocated and inserted
+	//     into 'pgdir'.
+  	pte = pgdir_walk(pgdir, va, 1);
+	if (!pte) 
+	{
+		pp->pp_ref--;
+		return -E_NO_MEM;
+	}
+	physaddr_t pa = page2pa(pp);
+	// We have to make sure the page table entry has this permission!
+	*pte = pa | perm | PTE_P;
 	return 0;
 }
 
@@ -430,7 +500,14 @@ struct PageInfo *
 page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 {
 	// Fill this function in
-	return NULL;
+	pte_t *page_table_entry = pgdir_walk(pgdir, va, 0);
+	//If pte_store is not zero, then we store in it the address
+	//of the pte for this page.
+	if (pte_store)
+		*pte_store = page_table_entry;
+	if (!page_table_entry)
+		return NULL;
+	return pa2page(PTE_ADDR(*page_table_entry));
 }
 
 //
@@ -452,6 +529,20 @@ void
 page_remove(pde_t *pgdir, void *va)
 {
 	// Fill this function in
+	pte_t *pte_store;
+	struct PageInfo *page = page_lookup(pgdir, va, &pte_store);
+	//pte_store будет хранить адрес страницы
+	//Если страница по этому адресу отсутствует, ничего не делаем
+	if (!page) return;
+	//Уменьшаем счетчик ссылок, а если он станет равным 0, то 
+	//в page_decref() будет вызвана page_free()
+	page_decref(page);
+	//
+	// Invalidate a TLB entry, but only if the page tables being
+	// edited are the ones currently in use by the processor.
+	//
+	*pte_store = 0;
+	tlb_invalidate(pgdir, va);
 }
 
 //
