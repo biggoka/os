@@ -342,7 +342,7 @@ page_free(struct PageInfo *pp)
 void
 page_decref(struct PageInfo* pp)
 {
-	if (--pp->pp_ref == 0)
+	if (--(pp->pp_ref) == 0)
 		page_free(pp);
 }
 
@@ -369,7 +369,7 @@ page_decref(struct PageInfo* pp)
 // table and page directory entries.
 //
 pte_t *
-pgdir_walk(pde_t *pgdir, const void *va, int create)
+pgdir_walk(pde_t *pgdir, const void *va, int cre ate)
 {
 	// Fill this function in
 	struct PageInfo *page;
@@ -391,6 +391,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 		//если при вызове create == false (т.е. запись не существует)
 		if (!create)
 			return NULL;
+
 		page = page_alloc(ALLOC_ZERO);
 		//нет памяти под выделение, тогда возвращаем NULL
 		if (!page)
@@ -469,11 +470,12 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 	//   - If there is already a page mapped at 'va', it should be page_remove()d.
 	//   - The TLB must be invalidated if a page was formerly present at 'va'.
 	// The page table is recorded in the page directory, and the page is present
-  	if (pte && (*pte & PTE_P)) page_remove(pgdir, va);
+  	if (pte && (*pte & PTE_P))
+  		page_remove(pgdir, va);
 
 	//   - If necessary, on demand, a page table should be allocated and inserted
 	//     into 'pgdir'.
-  	pte = pgdir_walk(pgdir, va, 1);
+  	pte = pgdir_walk(pgdir, va, true);
 	if (!pte) 
 	{
 		pp->pp_ref--;
