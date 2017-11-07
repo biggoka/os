@@ -369,41 +369,37 @@ page_decref(struct PageInfo* pp)
 // table and page directory entries.
 //
 pte_t *
-pgdir_walk(pde_t *pgdir, const void *va, int cre ate)
+pgdir_walk(pde_t *pgdir, const void *va, int create)
 {
 	// Fill this function in
 	struct PageInfo *page;
 	pte_t *page_table;
-	//С помощью PDX получаем иднекс страницы для  таблицы страниц
 	size_t page_dir_index = PDX(va);
 	pde_t page_dir_entry = pgdir[page_dir_index];
-	//P — Present, присутствие. Означает, что страница отображена и может использоваться при трансляции адреса.
-	//Поэтому здесь мы проверяем возможность этого использования
+	
+	
 	if (page_dir_entry & PTE_P) 
 	{
-		//Здесь получаем адрес таблицы страниц, адрес нужной нам структуры pte_t
-		//PTE_ADDR берет от адреса каталога страниц старшие 20 бит, то есть получает адрес таблицы страниц
 		page_table = KADDR(PTE_ADDR(page_dir_entry));
-		//KADDR переводит физический адрес в виртуальный
 	}
 	else 
 	{
-		//если при вызове create == false (т.е. запись не существует)
+		
 		if (!create)
 			return NULL;
 
 		page = page_alloc(ALLOC_ZERO);
-		//нет памяти под выделение, тогда возвращаем NULL
+		
 		if (!page)
 			return NULL;
-		//Увеличиваем счетчик ссылок на страницу
+		
 		page->pp_ref++;
-		//с помощью page2pa() получаем физ. адрес нашей выделенной страницы и выставляем там нужные флаги
+		
 		pgdir[page_dir_index] = page2pa(page) | PTE_U | PTE_W | PTE_P;
-		//в адресе таблицы страниц нам нужен виртуальный адрес страницы 
+		
 		page_table = (pte_t *)page2kva(page);
 	}
-	//С помощью PTX получаем иднекс конкретной страницы 
+	
 	size_t page_table_index = PTX(va);
 	return &page_table[page_table_index];
 }
@@ -425,11 +421,7 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 	// Fill this function in
 	for (uint32_t i = 0; i < size; i += PGSIZE) 
 	{
-		//C помощью pgdir_walk() получаем запись pte_t из каталога страниц по адресу (va + i)
-
 		pte_t *page_table_entry = pgdir_walk(pgdir, (void *)va + i, true);
-
-		//Выставляем необъодимые флаги
 		*page_table_entry = (pa + i) | perm | PTE_P;
 	}
 }
