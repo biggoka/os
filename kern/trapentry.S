@@ -57,7 +57,14 @@
 .type _alltraps, @function;
 .align 2
 _alltraps:
-    jmp .
+	pushl %ds
+	pushl %es 
+	pushal
+	movl $GD_KD, %eax
+	movl %eax, %ds 
+	movl %eax, %es
+	pushl %esp
+	call trap
 
 .globl clock_thdlr
 .type clock_thdlr, @function;
@@ -96,4 +103,30 @@ clock_thdlr:
 #else
 TRAPHANDLER_NOEC(clock_thdlr, IRQ_OFFSET + IRQ_CLOCK)
 // LAB 8: Your code here.
+TRAPHANDLER_NOEC(divide_err, T_DIVIDE)
+TRAPHANDLER_NOEC(debug_exception, T_DEBUG)
+TRAPHANDLER_NOEC(non_maskable_interrupt, T_NMI)
+TRAPHANDLER_NOEC(break_point, T_BRKPT)
+TRAPHANDLER_NOEC(overflow, T_OFLOW)
+TRAPHANDLER_NOEC(bound_check, T_BOUND)
+TRAPHANDLER_NOEC(illegal_opcode, T_ILLOP)
+TRAPHANDLER(device, T_DEVICE)
+TRAPHANDLER(double_fault, T_DBLFLT)
+TRAPHANDLER(task_switch_segment, T_TSS)
+TRAPHANDLER(segment_not_present, T_SEGNP)
+TRAPHANDLER(stack_exception, T_STACK)
+TRAPHANDLER(gen_prot_fault, T_GPFLT)
+TRAPHANDLER(page_fault, T_PGFLT)
+TRAPHANDLER(floating_point_err, T_FPERR)
+TRAPHANDLER(align_check, T_ALIGN)
+TRAPHANDLER(machine_check, T_MCHK)
+TRAPHANDLER(simd_err, T_SIMDERR)
+TRAPHANDLER_NOEC(sys_call, T_SYSCALL)
+
+TRAPHANDLER_NOEC(timer, IRQ_OFFSET + IRQ_TIMER)
+TRAPHANDLER_NOEC(kbd, IRQ_OFFSET + IRQ_KBD)
+TRAPHANDLER_NOEC(serial, IRQ_OFFSET + IRQ_SERIAL)
+TRAPHANDLER_NOEC(spurious, IRQ_OFFSET + IRQ_SPURIOUS)
+TRAPHANDLER_NOEC(ide, IRQ_OFFSET + IRQ_IDE)
+TRAPHANDLER_NOEC(irq_err, IRQ_OFFSET + IRQ_ERROR)
 #endif

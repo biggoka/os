@@ -69,12 +69,68 @@ static const char *trapname(int trapno)
 	return "(unknown trap)";
 }
 
+void divide_err();
+void debug_exception();
+void non_maskable_interrupt();
+void break_point();
+void overflow();
+void bound_check();
+void illegal_opcode();
+void device(struct Trapframe *tf);
+void double_fault(struct Trapframe *tf);
+void task_switch_segment(struct Trapframe *tf);
+void segment_not_present(struct Trapframe *tf);
+void stack_exception(struct Trapframe *tf);
+void gen_prot_fault(struct Trapframe *tf);
+void page_fault(struct Trapframe *tf);
+void floating_point_err(struct Trapframe *tf);
+void align_check(struct Trapframe *tf);
+void machine_check(struct Trapframe *tf);
+void simd_err(struct Trapframe *tf);
+void sys_call();
+
+void timer();
+void kbd();
+void serial();
+void spurious();
+void ide();
+void irq_err();
+
 void
 trap_init(void)
 {
 //	extern struct Segdesc gdt[];
 
 	// LAB 8: Your code here.
+
+	SETGATE(idt[0], 0, GD_KT, divide_err, 0);
+	SETGATE(idt[1], 0, GD_KT, debug_exception, 0);
+	SETGATE(idt[2], 0, GD_KT, non_maskable_interrupt, 0);
+
+	SETGATE(idt[3], 0, GD_KT, break_point, 3);
+	
+	SETGATE(idt[4], 0, GD_KT, overflow, 0);
+	SETGATE(idt[5], 0, GD_KT, bound_check, 0);
+	SETGATE(idt[6], 0, GD_KT, illegal_opcode, 0);
+	SETGATE(idt[7], 0, GD_KT, device, 0);
+	SETGATE(idt[8], 0, GD_KT, double_fault, 0);
+	SETGATE(idt[10], 0, GD_KT, task_switch_segment, 0);
+	SETGATE(idt[11], 0, GD_KT, segment_not_present, 0);
+	SETGATE(idt[12], 0, GD_KT, stack_exception, 0);
+	SETGATE(idt[13], 0, GD_KT, gen_prot_fault, 0);
+	SETGATE(idt[14], 0, GD_KT, page_fault, 0);
+	SETGATE(idt[16], 0, GD_KT, floating_point_err, 0);
+	SETGATE(idt[17], 0, GD_KT, align_check, 0);
+	SETGATE(idt[18], 0, GD_KT, machine_check, 0);
+	SETGATE(idt[19], 0, GD_KT, simd_err, 0);
+	SETGATE(idt[T_SYSCALL], 0, GD_KT, sys_call, 3);
+
+	SETGATE(idt[IRQ_OFFSET + IRQ_TIMER], 0, GD_KT, timer, 0);
+	SETGATE(idt[IRQ_OFFSET + IRQ_KBD], 0, GD_KT, kbd, 0);
+	SETGATE(idt[IRQ_OFFSET + IRQ_SERIAL], 0, GD_KT, serial, 0);
+	SETGATE(idt[IRQ_OFFSET + IRQ_SPURIOUS], 0, GD_KT, spurious, 0);
+	SETGATE(idt[IRQ_OFFSET + IRQ_IDE], 0, GD_KT, ide, 0);
+	SETGATE(idt[IRQ_OFFSET + IRQ_ERROR], 0, GD_KT, irq_err, 0);
 
 	// Per-CPU setup 
 	trap_init_percpu();
@@ -168,6 +224,32 @@ trap_dispatch(struct Trapframe *tf)
 	// IRQ line or other reasons. We don't care.
 	//
 	uint8_t status;
+
+	if (tf->tf_trapno == T_SYSCALL)
+	{	
+		tf->tf_regs.reg_eax = 
+		syscall(tf->tf_regs.reg_eax, 
+				tf->tf_regs.reg_edx, 
+				tf->tf_regs.reg_ecx, 
+				tf->tf_regs.reg_ebx,
+				tf->tf_regs.reg_edi,
+				tf->tf_regs.reg_esi);
+		return;
+	}
+
+	if (tf->tf_trapno == T_BRKPT)
+	{
+		monitor(tf);
+		return;
+	}
+	
+	if (tf->tf_trapno == T_PGFLT)
+	{
+		page_fault_handler(tf);
+		return;
+	}
+
+
 	if (tf->tf_trapno == IRQ_OFFSET + IRQ_SPURIOUS) {
 		cprintf("Spurious interrupt on irq 7\n");
 		print_trapframe(tf);
@@ -254,6 +336,10 @@ page_fault_handler(struct Trapframe *tf)
 	// Handle kernel-mode page faults.
 
 	// LAB 8: Your code here.
+	if (tf->tf_cs == GD_KT)
+	{
+		panic("page_fault in Kernel-Mode");
+	}
 
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.

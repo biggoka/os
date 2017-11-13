@@ -195,6 +195,12 @@ env_setup_vm(struct Env *e)
 	//    - The functions in kern/pmap.h are handy.
 
 	// LAB 8: Your code here.
+	p->pp_ref++;
+	e->env_pgdir = (pde_t *)page2kva(p);
+	for(int i = PDX(UTOP); i < NPDENTRIES; i++)
+	{
+		e->env_pgdir[i] = kern_pgdir[i];
+	}
 
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
@@ -301,6 +307,23 @@ region_alloc(struct Env *e, void *va, size_t len)
 	//   'va' and 'len' values that are not page-aligned.
 	//   You should round va down, and round (va + len) up.
 	//   (Watch out for corner-cases!)
+
+	struct PageInfo *p = NULL; 
+	int err;
+	for(uint32_t i = (uint32_t)ROUNDDOWN(va, PGSIZE); i < (uint32_t)ROUNDUP(va + len, PGSIZE); i+= PGSIZE)
+	{
+		// Does not zero or otherwise initialize the mapped pages in any way.
+		if (!(p = page_alloc(0)))
+		{
+			//err = -E_NO_MEM;
+			panic("region_alloc: %i", -E_NO_MEM);
+		}
+		// Pages should be writable by user and kernel.
+		// Panic if any allocation attempt fails.
+		err = page_insert(e->env_pgdir, p, (void *)i, PTE_W | PTE_U | PTE_P);
+		if (err != 0)
+			panic("region_alloc: %i", err);	
+	}
 }
 
 #ifdef CONFIG_KSPACE
@@ -310,13 +333,10 @@ bind_functions(struct Env *e, struct Elf *elf)
 	//find_function from kdebug.c should be used
 	//LAB 3: Your code here.
 
-	struct Secthdr *sh_start = (struct Secthdr *) ((uint8_t *) elf + elf->e_shoff);//задаем указатель на начало массива со структурами
-	struct Secthdr *sh_end = sh_start + elf->e_shnum;//задаем конец массива структур
-	struct Secthdr *sh;//переменная для цикла, перебирающего все структуры в поисках нужных нам
-	//Поле sh_name хранит индекс имени секции. Индекс имени - это смещение в данных секции, 
-	//индекс которой задается в поле e_shstrndx заголовка ELF-файла. 
-	//По этому смещению размещается строка, завершающаяся нулевым байтом, являющаяся именем секции.
-	//Поле e_shstrndx хранит индекс заголовка секции, которая хранит имена всех секций.
+	struct Secthdr *sh_start = (struct Secthdr *) ((uint8_t *) elf + elf->e_shoff);
+	struct Secthdr *sh_end = sh_start + elf->e_shnum;
+	struct Secthdr *sh;
+
 	char *sh_strtab = (char *) elf + sh_start[elf->e_shstrndx].sh_offset;
 	char *strtab = NULL;
 	struct Elf32_Sym *sym_start = NULL, *sym_end = NULL, *sym;
@@ -341,7 +361,7 @@ bind_functions(struct Env *e, struct Elf *elf)
 		addr = find_function(&strtab[sym->st_name]);
 		if (addr)
 			*((uint32_t *) (sym->st_value)) = (uint32_t) addr;
-			//по адресам глобальных указателей на функции записываются адреса функций ядра.
+			
 	}
 
 	/*
@@ -417,10 +437,14 @@ load_icode(struct Env *e, uint8_t *binary, size_t size)
 	ph = (struct Proghdr *) ((uint8_t *)ELFHDR + ELFHDR->e_phoff);
 	eph = ph + ELFHDR->e_phnum;
 
+	lcr3(PADDR(e->env_pgdir));
+
 	for (; ph < eph; ph++)
 	{ 
 		if (ph->p_type == ELF_PROG_LOAD && ph->p_filesz <= ph->p_memsz)
 		{
+			region_alloc(e, (void *)ph->p_va, ph->p_memsz);
+
 			memmove((void *)ph->p_va, binary + ph->p_offset, ph->p_filesz);
 			memset((void *)ph->p_va + ph->p_filesz, 0, ph->p_memsz-ph->p_filesz);
 		}
@@ -434,6 +458,7 @@ load_icode(struct Env *e, uint8_t *binary, size_t size)
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
 	// LAB 8: Your code here.
+	region_alloc(e, (void *)(USTACKTOP - PGSIZE), PGSIZE);
 }
 
 //

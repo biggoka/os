@@ -150,6 +150,8 @@ debuginfo_eip(uintptr_t addr, struct Eipdebuginfo *info)
 
 		// Make sure the STABS and string table memory is valid.
 		// LAB 8: Your code here.
+		user_mem_assert(curenv,stabs, stab_end - stabs, PTE_U);
+		user_mem_assert(curenv,stabstr, stabstr_end - stabstr, PTE_U);
 	}
 
 	// String table validity checks

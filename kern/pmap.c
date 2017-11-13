@@ -159,6 +159,8 @@ mem_init(void)
 	//////////////////////////////////////////////////////////////////////
 	// Make 'envs' point to an array of size 'NENV' of 'struct Env'.
 	// LAB 8: Your code here.
+	envs = (struct Env *) boot_alloc(NENV * sizeof(struct Env));
+	memset(envs, 0, NENV * sizeof(struct Env));
 
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
@@ -195,6 +197,8 @@ mem_init(void)
 	//    - the new image at UENVS  -- kernel R, user R
 	//    - envs itself -- kernel RW, user NONE
 	// LAB 8: Your code here.
+	boot_map_region(kern_pgdir, UENVS, NENV * sizeof(struct Env), PADDR(envs), PTE_U);
+	boot_map_region(kern_pgdir, (uintptr_t)envs, NENV * sizeof(struct Env), PADDR(envs), PTE_W);
 
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
@@ -594,6 +598,29 @@ int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
 	// LAB 8: Your code here.
+	pde_t *page_dir_entry = env->env_pgdir;
+	pte_t *page_table_entry;
+	user_mem_check_addr = (uintptr_t)ROUNDDOWN(va, PGSIZE);
+	if (user_mem_check_addr == 0x00000000)
+	{
+		//cprintf("addr = %d\n", (uintptr_t)va);
+		user_mem_check_addr = (uintptr_t)va;
+		//cprintf("new addr = %d\n", user_mem_check_addr);
+	}
+	for( ;user_mem_check_addr < (uintptr_t)ROUNDUP(va + len, PGSIZE); 
+		user_mem_check_addr += PGSIZE)
+	{
+		
+		page_table_entry = pgdir_walk(page_dir_entry, (void *)user_mem_check_addr, 0);
+
+		if  ((user_mem_check_addr >= ULIM) || 
+			((page_dir_entry[PDX(user_mem_check_addr)] & perm) != perm) || 
+			((*page_table_entry & perm) != perm))
+		{
+			return -E_FAULT;
+		}
+
+	}
 
 	return 0;
 }
