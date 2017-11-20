@@ -25,6 +25,14 @@ pgfault(struct UTrapframe *utf)
 
 	// LAB 9: Your code here.
 
+	//pgfault() проверяет, что ошибка является записью (проверка на FEC_WR в коде ошибки) и что PTE для страницы помечен PTE_COW. Если нет, паникует.
+
+	int r;
+	pte_t pte = uvpt[PGNUM(addr)];
+    if (!(err & FEC_WR) || !(pte & PTE_COW))
+    {
+		panic("pgfault!!!");
+	}
 	// Allocate a new page, map it at a temporary location (PFTEMP),
 	// copy the data from the old page to the new page, then move the new
 	// page to the old page's address.
@@ -33,8 +41,27 @@ pgfault(struct UTrapframe *utf)
 	//   No need to explicitly delete the old page's mapping.
 
 	// LAB 9: Your code here.
+	// Allocate a new page, map it at a temporary location (PFTEMP),
+	r = sys_page_alloc(sys_getenvid(), PFTEMP, PTE_W | PTE_U | PTE_P);
+	if (r)
+	{
+       	panic("sys_page_alloc: %i", r);
+	}
+	addr = ROUNDDOWN(addr, PGSIZE);
+	// copy the data from the old page to the new page, then move the new page to the old page's address.
+    memmove(PFTEMP, addr, PGSIZE);
 
-	panic("pgfault not implemented");
+    r = sys_page_map(sys_getenvid(), PFTEMP, sys_getenvid(), addr, PTE_W | PTE_U | PTE_P);
+	if (r)
+	{
+    	panic("sys_page_map: %i", r);
+	}
+	r = sys_page_unmap(sys_getenvid(), PFTEMP);
+	if (r)
+	{
+    	panic("sys_page_unmap: %i", r);
+	}
+	return;
 }
 
 //
@@ -52,7 +79,28 @@ static int
 duppage(envid_t envid, unsigned pn)
 {
 	// LAB 9: Your code here.
-	panic("duppage not implemented");
+	pte_t pte = uvpt[pn];
+	void *va = (void *)(pn << PGSHIFT);
+
+	int err;
+	
+	if ((pte & PTE_W) || (pte & PTE_COW)) 
+	{
+		err = sys_page_map(sys_getenvid(), va, envid, va, PTE_COW | PTE_U | PTE_P);
+        if (err)
+        {	
+        	panic("duppage cow: %i", err);
+        }
+        err = sys_page_map(sys_getenvid(), va, sys_getenvid(), va, PTE_COW | PTE_U | PTE_P);
+        if (err)
+        {	
+        	panic("duppage perm: %i", err);
+ 		}
+ 	}
+	else if (sys_page_map(sys_getenvid(), va, envid, va, PTE_U | PTE_P))
+	{
+		panic("duppage map");
+	}
 	return 0;
 }
 
@@ -76,7 +124,56 @@ envid_t
 fork(void)
 {
 	// LAB 9: Your code here.
-	panic("fork not implemented");
+	int err;
+	// Set up our page fault handler appropriately.
+	set_pgfault_handler(pgfault);
+	// Create a child.
+	envid_t envid = sys_exofork();
+	if (envid < 0) 
+	{
+		panic("exofork: %i",envid);
+	}
+	else if (envid == 0) 
+	{
+		//Remember to fix "thisenv" in the child process.
+		thisenv = &envs[ENVX(sys_getenvid())];
+		return 0;
+	}
+	int ipd, ipt;
+	for (ipd = 0; ipd != PDX(UTOP); ipd++) 
+	{
+		if (!(uvpd[ipd] & PTE_P))
+			continue;
+		for (ipt = 0; ipt != NPTENTRIES; ipt++) 
+		{
+			unsigned pn = (ipd << 10) | ipt;
+			if (pn == PGNUM(UXSTACKTOP - PGSIZE)) 
+			{
+				//   so you must allocate a new page for the child's user exception stack.
+				err = sys_page_alloc(envid, (void *)(UXSTACKTOP - PGSIZE), PTE_W | PTE_U | PTE_P);
+				if (err)
+				{
+					panic("fork xstack: %i", err);
+				}
+				continue;
+			}
+			if (uvpt[pn] & PTE_P)
+			{	
+				duppage(envid, pn);
+			}
+		}
+	}
+	err = sys_env_set_pgfault_upcall(envid, thisenv->env_pgfault_upcall);
+	if (err)
+	{	
+		panic("sys_env_set_pgfault_upcall: %i", err);
+	}
+	err = sys_env_set_status(envid, ENV_RUNNABLE);
+	if (err)
+	{
+		panic("sys_env_set_status: %i", err);
+	}
+	return envid;
 }
 
 // Challenge!

@@ -553,11 +553,10 @@ env_destroy(struct Env *e)
 	//LAB 3: Your code here.
 	env_free(e);
 
-	sched_yield();
-
-	cprintf("Destroyed the only environment - nothing more to do!\n");
-	while (1)
-		monitor(NULL);
+	if (curenv == e) {
+		curenv = NULL;
+		sched_yield();
+	}
 }
 
 #ifdef CONFIG_KSPACE
@@ -668,6 +667,7 @@ env_run(struct Env *e)
 	curenv->env_status = ENV_RUNNING;
 	curenv->env_runs++;
 
+	lcr3(PADDR(curenv->env_pgdir));
 
 	env_pop_tf(&e->env_tf);
 }

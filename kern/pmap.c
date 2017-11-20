@@ -636,12 +636,6 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 	pde_t *page_dir_entry = env->env_pgdir;
 	pte_t *page_table_entry;
 	user_mem_check_addr = (uintptr_t)ROUNDDOWN(va, PGSIZE);
-	if (user_mem_check_addr == 0x00000000)
-	{
-		//cprintf("addr = %d\n", (uintptr_t)va);
-		user_mem_check_addr = (uintptr_t)va;
-		//cprintf("new addr = %d\n", user_mem_check_addr);
-	}
 	for( ;user_mem_check_addr < (uintptr_t)ROUNDUP(va + len, PGSIZE); 
 		user_mem_check_addr += PGSIZE)
 	{
@@ -652,11 +646,11 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 			((page_dir_entry[PDX(user_mem_check_addr)] & perm) != perm) || 
 			((*page_table_entry & perm) != perm))
 		{
+			user_mem_check_addr = (user_mem_check_addr < (uint32_t)va ? (uint32_t)va : user_mem_check_addr);
 			return -E_FAULT;
 		}
 
 	}
-
 	return 0;
 }
 
