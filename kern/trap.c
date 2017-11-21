@@ -69,32 +69,26 @@ static const char *trapname(int trapno)
 	return "(unknown trap)";
 }
 
-void divide_err();
-void debug_exception();
-void non_maskable_interrupt();
-void break_point();
-void overflow();
-void bound_check();
-void illegal_opcode();
-void device(struct Trapframe *tf);
-void double_fault(struct Trapframe *tf);
-void task_switch_segment(struct Trapframe *tf);
-void segment_not_present(struct Trapframe *tf);
-void stack_exception(struct Trapframe *tf);
-void gen_prot_fault(struct Trapframe *tf);
-void page_fault(struct Trapframe *tf);
-void floating_point_err(struct Trapframe *tf);
-void align_check(struct Trapframe *tf);
-void machine_check(struct Trapframe *tf);
-void simd_err(struct Trapframe *tf);
-void sys_call();
+extern void divide_err();
+extern void debug_exception();
+extern void non_maskable_interrupt();
+extern void break_point();
+extern void overflow();
+extern void bound_check();
+extern void illegal_opcode();
+extern void device();
+extern void double_fault();
+extern void task_switch_segment();
+extern void segment_not_present();
+extern void stack_exception();
+extern void gen_prot_fault();
+extern void page_fault();
+extern void floating_point_err();
+extern void align_check();
+extern void machine_check();
+extern void simd_err();
+extern void sys_call();
 
-void timer();
-void kbd();
-void serial();
-void spurious();
-void ide();
-void irq_err();
 
 void
 trap_init(void)
@@ -106,9 +100,7 @@ trap_init(void)
 	SETGATE(idt[0], 0, GD_KT, divide_err, 0);
 	SETGATE(idt[1], 0, GD_KT, debug_exception, 0);
 	SETGATE(idt[2], 0, GD_KT, non_maskable_interrupt, 0);
-
 	SETGATE(idt[3], 0, GD_KT, break_point, 3);
-	
 	SETGATE(idt[4], 0, GD_KT, overflow, 0);
 	SETGATE(idt[5], 0, GD_KT, bound_check, 0);
 	SETGATE(idt[6], 0, GD_KT, illegal_opcode, 0);
@@ -125,12 +117,6 @@ trap_init(void)
 	SETGATE(idt[19], 0, GD_KT, simd_err, 0);
 	SETGATE(idt[T_SYSCALL], 0, GD_KT, sys_call, 3);
 
-	SETGATE(idt[IRQ_OFFSET + IRQ_TIMER], 0, GD_KT, timer, 0);
-	SETGATE(idt[IRQ_OFFSET + IRQ_KBD], 0, GD_KT, kbd, 0);
-	SETGATE(idt[IRQ_OFFSET + IRQ_SERIAL], 0, GD_KT, serial, 0);
-	SETGATE(idt[IRQ_OFFSET + IRQ_SPURIOUS], 0, GD_KT, spurious, 0);
-	SETGATE(idt[IRQ_OFFSET + IRQ_IDE], 0, GD_KT, ide, 0);
-	SETGATE(idt[IRQ_OFFSET + IRQ_ERROR], 0, GD_KT, irq_err, 0);
 
 	// Per-CPU setup 
 	trap_init_percpu();
@@ -336,7 +322,7 @@ page_fault_handler(struct Trapframe *tf)
 	// Handle kernel-mode page faults.
 
 	// LAB 8: Your code here.
-	if (tf->tf_cs == GD_KT)
+	if ((tf->tf_cs & 0x3) == 0)
 	{
 		panic("page_fault in Kernel-Mode");
 	}
