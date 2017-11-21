@@ -282,6 +282,12 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 
 	// You will set e->env_tf.tf_eip later.
 
+	// Clear the page fault handler until user installs one.
+	e->env_pgfault_upcall = 0;
+
+	// Also clear the IPC receiving flag.
+	e->env_ipc_recving = 0;
+
 	// commit the allocation
 	env_free_list = e->env_link;
 	*newenv_store = e;
@@ -547,11 +553,10 @@ env_destroy(struct Env *e)
 	//LAB 3: Your code here.
 	env_free(e);
 
-	sched_yield();
-
-	cprintf("Destroyed the only environment - nothing more to do!\n");
-	while (1)
-		monitor(NULL);
+	if (curenv == e) {
+		curenv = NULL;
+		sched_yield();
+	}
 }
 
 #ifdef CONFIG_KSPACE
@@ -662,6 +667,7 @@ env_run(struct Env *e)
 	curenv->env_status = ENV_RUNNING;
 	curenv->env_runs++;
 
+	lcr3(PADDR(curenv->env_pgdir));
 
 	env_pop_tf(&e->env_tf);
 }
