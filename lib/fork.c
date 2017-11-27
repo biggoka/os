@@ -31,6 +31,7 @@ pgfault(struct UTrapframe *utf)
 	pte_t pte = uvpt[PGNUM(addr)];
     if (!(err & FEC_WR) || !(pte & PTE_COW))
     {
+    	//cprintf("err: %i", err);
 		panic("pgfault!!!");
 	}
 	// Allocate a new page, map it at a temporary location (PFTEMP),
@@ -83,8 +84,10 @@ duppage(envid_t envid, unsigned pn)
 	void *va = (void *)(pn << PGSHIFT);
 
 	int err;
-	
-	if ((pte & PTE_W) || (pte & PTE_COW)) 
+	if (uvpt[pn] & PTE_SHARE) {
+		sys_page_map(0, va, envid, va, uvpt[pn] & PTE_SYSCALL);
+	} 
+	else if ((pte & PTE_W) || (pte & PTE_COW)) 
 	{
 		err = sys_page_map(sys_getenvid(), va, envid, va, PTE_COW | PTE_U | PTE_P);
         if (err)

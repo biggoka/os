@@ -37,7 +37,7 @@ struct OpenFile {
 };
 
 // Max number of open files in the file system at once
-#define MAXOPEN		1024
+#define MAXOPEN		1024 
 #define FILEVA		0xD0000000
 
 // initialize to force into data section

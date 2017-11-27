@@ -285,20 +285,20 @@ page_init(void)
 	// NB: DO NOT actually touch the physical memory corresponding to
 	// free pages!
 	size_t i;
-	pages[0].pp_ref = 1;
+	// pages[0].pp_ref = 1;
 	for (i = 1; i < npages_basemem; i++) {
 		pages[i].pp_ref = 0;
 		pages[i].pp_link = page_free_list;
 		page_free_list = &pages[i];
 	}
-	for(i = npages_basemem; i < EXTPHYSMEM/PGSIZE; i++)
-	{
-		pages[i].pp_ref = 1;		
-	}
-	for(i = EXTPHYSMEM/PGSIZE; i < PGNUM(PADDR(boot_alloc(0))); i++)
-	{
-		pages[i].pp_ref = 1;
-	}
+	// for(i = npages_basemem; i < EXTPHYSMEM/PGSIZE; i++)
+	// {
+	// 	pages[i].pp_ref = 1;		
+	// }
+	// for(i = EXTPHYSMEM/PGSIZE; i < PGNUM(PADDR(boot_alloc(0))); i++)
+	// {
+	// 	pages[i].pp_ref = 1;
+	// }
 
 	for (i = PGNUM(PADDR(boot_alloc(0))); i < npages; i++) 
 	{
