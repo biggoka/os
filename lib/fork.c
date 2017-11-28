@@ -25,8 +25,6 @@ pgfault(struct UTrapframe *utf)
 
 	// LAB 9: Your code here.
 
-	//pgfault() проверяет, что ошибка является записью (проверка на FEC_WR в коде ошибки) и что PTE для страницы помечен PTE_COW. Если нет, паникует.
-
 	int r;
 	pte_t pte = uvpt[PGNUM(addr)];
     if (!(err & FEC_WR) || !(pte & PTE_COW))
