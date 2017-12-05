@@ -118,6 +118,10 @@ devfile_read(struct Fd *fd, void *buf, size_t n)
 	int r;
 
 	fsipcbuf.read.req_fileid = fd->fd_file.id;
+	if (n > PGSIZE)
+	{
+		n = PGSIZE;
+	}
 	fsipcbuf.read.req_n = n;
 	if ((r = fsipc(FSREQ_READ, NULL)) < 0)
 		return r;

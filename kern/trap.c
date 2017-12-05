@@ -14,6 +14,11 @@
 #include <kern/picirq.h>
 #include <kern/cpu.h>
 
+#include <kern/vsyscall.h>
+#include <inc/vsyscall.h>
+
+
+
 #ifndef debug
 # define debug 0
 #endif
@@ -249,6 +254,7 @@ trap_dispatch(struct Trapframe *tf)
 	if (tf->tf_trapno == IRQ_OFFSET + IRQ_CLOCK) {
 		status = rtc_check_status();
 		pic_send_eoi(IRQ_CLOCK);
+		vsys[VSYS_gettime] = gettime();
 		sched_yield();
 		return;
 	}

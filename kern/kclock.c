@@ -2,14 +2,54 @@
 
 #include <inc/x86.h>
 #include <kern/kclock.h>
+#include <inc/time.h>
+#include <inc/vsyscall.h>
+#include <kern/vsyscall.h>
+
+int read_time(void)
+{
+	struct tm time;
+
+	int sec = BCD2BIN(mc146818_read(RTC_SEC));
+	int min = BCD2BIN(mc146818_read(RTC_MIN));
+	int hour = BCD2BIN(mc146818_read(RTC_HOUR));
+
+	int day = BCD2BIN(mc146818_read(RTC_DAY));
+	int mon = BCD2BIN(mc146818_read(RTC_MON)) - 1;
+	int year = BCD2BIN(mc146818_read(RTC_YEAR));
+
+	time.tm_sec = sec;
+	time.tm_min = min;
+	time.tm_hour = hour;
+	time.tm_mday = day;
+	time.tm_mon = mon;
+	time.tm_year = year;
+
+	int t = timestamp(&time);
+	return t;
+}
 
 int gettime(void)
 {
 	nmi_disable();
 	// LAB 12: your code here
+	while (mc146818_read(RTC_UPDATE_IN_PROGRESS) == 1) 
+		;
+
+	int t1 = read_time();
+	int t2 = read_time();
+
+	while (t1 != t2)
+	{
+		t1 = read_time();
+		t2 = read_time();
+	}
+	
+	vsys[VSYS_gettime] = t1;
+
 
 	nmi_enable();
-	return 0;
+	return t1;
 }
 
 void
