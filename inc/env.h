@@ -65,6 +65,17 @@ struct Env {
 	uint32_t env_ipc_value;		// Data value sent to us
 	envid_t env_ipc_from;		// envid of the sender
 	int env_ipc_perm;		// Perm of page mapping received
+
+	//threads
+	int is_pthread;
+	int pthread_id;
+	struct Env *parent_env;
+	int sched_policy;
+	int pthread_type;
+	int priority;
+	void **putres;
+
+
 };
 
 #endif // !JOS_INC_ENV_H

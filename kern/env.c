@@ -6,6 +6,7 @@
 #include <inc/string.h>
 #include <inc/assert.h>
 #include <inc/elf.h>
+#include <inc/pthread.h>
 
 #include <kern/env.h>
 #include <kern/pmap.h>
@@ -128,6 +129,7 @@ env_init(void)
 	// Set up envs array
 	//LAB 3: Your code here.
 	for (int i = NENV - 1; i >= 0; i--) {
+		memset(&envs[i], 0, sizeof(*envs));
 		envs[i].env_status = ENV_FREE;
 		envs[i].env_id = 0;
 		envs[i].env_link = env_free_list;
@@ -218,7 +220,7 @@ env_setup_vm(struct Env *e)
 //	-E_NO_MEM on memory exhaustion
 //
 int
-env_alloc(struct Env **newenv_store, envid_t parent_id)
+env_alloc(struct Env **newenv_store, envid_t parent_id, int is_pthread, struct Env *parent_env)
 {
 	int32_t generation;
 	int r;
@@ -228,9 +230,20 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 		return -E_NO_FREE_ENV;
 	}
 
-	// Allocate and set up the page directory for this environment.
-	if ((r = env_setup_vm(e)) < 0)
-		return r;
+	e->is_pthread = is_pthread;
+
+	if (!is_pthread)
+	{
+		// Allocate and set up the page directory for this environment.
+		if ((r = env_setup_vm(e)) < 0)
+			return r;		
+	}
+	else
+	{
+		e->parent_env = parent_env;
+		e->env_pgdir = parent_env->env_pgdir;
+	}
+
 
 	// Generate an env_id for this environment.
 	generation = (e->env_id + (1 << ENVGENSHIFT)) & ~(NENV - 1);
@@ -274,7 +287,16 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	e->env_tf.tf_ds = GD_UD | 3;
 	e->env_tf.tf_es = GD_UD | 3;
 	e->env_tf.tf_ss = GD_UD | 3;
+	if (!is_pthread)
+	{
 	e->env_tf.tf_esp = USTACKTOP;
+	}
+	else
+	{
+		//todo
+		//e->env_tf.tf_esp = get_stack_top();
+		e->env_tf.tf_esp = parent_env->env_tf.tf_esp;
+	}
 	e->env_tf.tf_cs = GD_UT | 3;
 #endif
 
@@ -480,7 +502,7 @@ env_create(uint8_t *binary, size_t size, enum EnvType type)
 	//LAB 3: Your code here.
 	int error;
 	struct Env *env_s;
-	error = env_alloc(&env_s,0);
+	error = env_alloc(&env_s,0, 0, NULL);
 	if (error) panic("env_alloc: %i", error);
 	env_s->env_type = type;
 	load_icode(env_s, binary, size);
@@ -507,7 +529,7 @@ env_free(struct Env *e)
 	// If freeing the current environment, switch to kern_pgdir
 	// before freeing the page directory, just in case the page
 	// gets reused.
-	if (e == curenv)
+	if ((e == curenv) && !e->is_pthread)
 		lcr3(PADDR(kern_pgdir));
 #endif
 
@@ -517,26 +539,38 @@ env_free(struct Env *e)
 #ifndef CONFIG_KSPACE
 	// Flush all mapped pages in the user portion of the address space
 	static_assert(UTOP % PTSIZE == 0);
-	for (pdeno = 0; pdeno < PDX(UTOP); pdeno++) {
 
-		// only look at mapped page tables
-		if (!(e->env_pgdir[pdeno] & PTE_P))
-			continue;
+	if (!e->is_pthread)
+	{
+		//todo
+		//delete all threads that are spawned by this process
 
-		// find the pa and va of the page table
-		pa = PTE_ADDR(e->env_pgdir[pdeno]);
-		pt = (pte_t*) KADDR(pa);
+		for (pdeno = 0; pdeno < PDX(UTOP); pdeno++) {
 
-		// unmap all PTEs in this page table
-		for (pteno = 0; pteno <= PTX(~0); pteno++) {
-			if (pt[pteno] & PTE_P)
-				page_remove(e->env_pgdir, PGADDR(pdeno, pteno, 0));
+			// only look at mapped page tables
+			if (!(e->env_pgdir[pdeno] & PTE_P))
+				continue;
+
+			// find the pa and va of the page table
+			pa = PTE_ADDR(e->env_pgdir[pdeno]);
+			pt = (pte_t*) KADDR(pa);
+
+			// unmap all PTEs in this page table
+			for (pteno = 0; pteno <= PTX(~0); pteno++) {
+				if (pt[pteno] & PTE_P)
+					page_remove(e->env_pgdir, PGADDR(pdeno, pteno, 0));
+			}
+
+			// free the page table itself
+			e->env_pgdir[pdeno] = 0;
+			page_decref(pa2page(pa));
 		}
-
-		// free the page table itself
-		e->env_pgdir[pdeno] = 0;
-		page_decref(pa2page(pa));
 	}
+	else
+	{
+		//
+	}
+
 
 	// free the page directory
 	pa = PADDR(e->env_pgdir);
@@ -544,9 +578,18 @@ env_free(struct Env *e)
 	page_decref(pa2page(pa));
 #endif
 	// return the environment to the free list
-	e->env_status = ENV_FREE;
-	e->env_link = env_free_list;
-	env_free_list = e;
+
+	if (!e->is_pthread)
+	{
+		e->env_status = ENV_FREE;
+		e->env_link = env_free_list;
+		env_free_list = e;
+	}
+	else
+	{
+
+	}
+
 }
 
 //

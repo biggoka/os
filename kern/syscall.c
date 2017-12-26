@@ -13,6 +13,8 @@
 #include <kern/sched.h>
 #include <kern/kclock.h>
 
+#include <inc/pthread.h>
+
 // Print a string to the system console.
 // The string is exactly 'len' characters long.
 // Destroys the environment on memory errors.
@@ -47,8 +49,8 @@ sys_getenvid(void)
 // Destroy a given environment (possibly the currently running environment).
 //
 // Returns 0 on success, < 0 on error.  Errors are:
-//	-E_BAD_ENV if environment envid doesn't currently exist,
-//		or the caller doesn't have permission to change envid.
+//  -E_BAD_ENV if environment envid doesn't currently exist,
+//    or the caller doesn't have permission to change envid.
 static int
 sys_env_destroy(envid_t envid)
 {
@@ -74,8 +76,8 @@ sys_yield(void)
 
 // Allocate a new environment.
 // Returns envid of new environment, or < 0 on error.  Errors are:
-//	-E_NO_FREE_ENV if no free environment is available.
-//	-E_NO_MEM on memory exhaustion.
+//  -E_NO_FREE_ENV if no free environment is available.
+//  -E_NO_MEM on memory exhaustion.
 static envid_t
 sys_exofork(void)
 {
@@ -89,7 +91,7 @@ sys_exofork(void)
 	// LAB 9: Your code here.
 	struct Env *child;
 
-	if (env_alloc(&child, curenv->env_id) < 0)
+	if (env_alloc(&child, curenv->env_id, 0, NULL) < 0)
 		return -E_NO_FREE_ENV;
 
 	child->env_status = ENV_NOT_RUNNABLE;
@@ -109,9 +111,9 @@ sys_exofork(void)
 // or ENV_NOT_RUNNABLE.
 //
 // Returns 0 on success, < 0 on error.  Errors are:
-//	-E_BAD_ENV if environment envid doesn't currently exist,
-//		or the caller doesn't have permission to change envid.
-//	-E_INVAL if status is not a valid status for an environment.
+//  -E_BAD_ENV if environment envid doesn't currently exist,
+//    or the caller doesn't have permission to change envid.
+//  -E_INVAL if status is not a valid status for an environment.
 static int
 sys_env_set_status(envid_t envid, int status)
 {
@@ -143,8 +145,8 @@ sys_env_set_status(envid_t envid, int status)
 // protection level 3 (CPL 3) with interrupts enabled.
 //
 // Returns 0 on success, < 0 on error.  Errors are:
-//	-E_BAD_ENV if environment envid doesn't currently exist,
-//		or the caller doesn't have permission to change envid.
+//  -E_BAD_ENV if environment envid doesn't currently exist,
+//    or the caller doesn't have permission to change envid.
 static int
 sys_env_set_trapframe(envid_t envid, struct Trapframe *tf)
 {
@@ -167,8 +169,8 @@ sys_env_set_trapframe(envid_t envid, struct Trapframe *tf)
 // 'func'.
 //
 // Returns 0 on success, < 0 on error.  Errors are:
-//	-E_BAD_ENV if environment envid doesn't currently exist,
-//		or the caller doesn't have permission to change envid.
+//  -E_BAD_ENV if environment envid doesn't currently exist,
+//    or the caller doesn't have permission to change envid.
 static int
 sys_env_set_pgfault_upcall(envid_t envid, void *func)
 {
@@ -195,12 +197,12 @@ sys_env_set_pgfault_upcall(envid_t envid, void *func)
 //         but no other bits may be set.  See PTE_SYSCALL in inc/mmu.h.
 //
 // Return 0 on success, < 0 on error.  Errors are:
-//	-E_BAD_ENV if environment envid doesn't currently exist,
-//		or the caller doesn't have permission to change envid.
-//	-E_INVAL if va >= UTOP, or va is not page-aligned.
-//	-E_INVAL if perm is inappropriate (see above).
-//	-E_NO_MEM if there's no memory to allocate the new page,
-//		or to allocate any necessary page tables.
+//  -E_BAD_ENV if environment envid doesn't currently exist,
+//    or the caller doesn't have permission to change envid.
+//  -E_INVAL if va >= UTOP, or va is not page-aligned.
+//  -E_INVAL if perm is inappropriate (see above).
+//  -E_NO_MEM if there's no memory to allocate the new page,
+//    or to allocate any necessary page tables.
 static int
 sys_page_alloc(envid_t envid, void *va, int perm)
 {
@@ -213,9 +215,9 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 
 	// LAB 9: Your code here.
 	int err;
-	if (((~PTE_SYSCALL) & perm) ||	//-E_INVAL if va >= UTOP
-		((uintptr_t)va >= UTOP) ||	//va is not page-aligned
-		((uintptr_t)va % PGSIZE))	//-E_INVAL if perm is inappropriate
+	if (((~PTE_SYSCALL) & perm) ||  //-E_INVAL if va >= UTOP
+		((uintptr_t)va >= UTOP) ||  //va is not page-aligned
+		((uintptr_t)va % PGSIZE)) //-E_INVAL if perm is inappropriate
 	{
 		err = -E_INVAL;
 		return err;
@@ -254,18 +256,18 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 // page.
 //
 // Return 0 on success, < 0 on error.  Errors are:
-//	-E_BAD_ENV if srcenvid and/or dstenvid doesn't currently exist,
-//		or the caller doesn't have permission to change one of them.
-//	-E_INVAL if srcva >= UTOP or srcva is not page-aligned,
-//		or dstva >= UTOP or dstva is not page-aligned.
-//	-E_INVAL is srcva is not mapped in srcenvid's address space.
-//	-E_INVAL if perm is inappropriate (see sys_page_alloc).
-//	-E_INVAL if (perm & PTE_W), but srcva is read-only in srcenvid's
-//		address space.
-//	-E_NO_MEM if there's no memory to allocate any necessary page tables.
+//  -E_BAD_ENV if srcenvid and/or dstenvid doesn't currently exist,
+//    or the caller doesn't have permission to change one of them.
+//  -E_INVAL if srcva >= UTOP or srcva is not page-aligned,
+//    or dstva >= UTOP or dstva is not page-aligned.
+//  -E_INVAL is srcva is not mapped in srcenvid's address space.
+//  -E_INVAL if perm is inappropriate (see sys_page_alloc).
+//  -E_INVAL if (perm & PTE_W), but srcva is read-only in srcenvid's
+//    address space.
+//  -E_NO_MEM if there's no memory to allocate any necessary page tables.
 static int
 sys_page_map(envid_t srcenvid, void *srcva,
-	     envid_t dstenvid, void *dstva, int perm)
+		 envid_t dstenvid, void *dstva, int perm)
 {
 	// Hint: This function is a wrapper around page_lookup() and
 	//   page_insert() from kern/pmap.c.
@@ -276,11 +278,11 @@ sys_page_map(envid_t srcenvid, void *srcva,
 
 	// LAB 9: Your code here.
 	int err;
-	if (((~PTE_SYSCALL) & perm)    ||	
-		((uintptr_t)srcva >= UTOP) ||	
+	if (((~PTE_SYSCALL) & perm)    || 
+		((uintptr_t)srcva >= UTOP) || 
 		((uintptr_t)srcva % PGSIZE)||
-		((uintptr_t)dstva >= UTOP) ||	
-		((uintptr_t)dstva % PGSIZE))	
+		((uintptr_t)dstva >= UTOP) || 
+		((uintptr_t)dstva % PGSIZE))  
 	{
 		err = -E_INVAL;
 		return err;
@@ -333,9 +335,9 @@ sys_page_map(envid_t srcenvid, void *srcva,
 // If no page is mapped, the function silently succeeds.
 //
 // Return 0 on success, < 0 on error.  Errors are:
-//	-E_BAD_ENV if environment envid doesn't currently exist,
-//		or the caller doesn't have permission to change envid.
-//	-E_INVAL if va >= UTOP, or va is not page-aligned.
+//  -E_BAD_ENV if environment envid doesn't currently exist,
+//    or the caller doesn't have permission to change envid.
+//  -E_INVAL if va >= UTOP, or va is not page-aligned.
 static int
 sys_page_unmap(envid_t envid, void *va)
 {
@@ -380,19 +382,19 @@ sys_page_unmap(envid_t envid, void *va)
 //
 // Returns 0 on success, < 0 on error.
 // Errors are:
-//	-E_BAD_ENV if environment envid doesn't currently exist.
-//		(No need to check permissions.)
-//	-E_IPC_NOT_RECV if envid is not currently blocked in sys_ipc_recv,
-//		or another environment managed to send first.
-//	-E_INVAL if srcva < UTOP but srcva is not page-aligned.
-//	-E_INVAL if srcva < UTOP and perm is inappropriate
-//		(see sys_page_alloc).
-//	-E_INVAL if srcva < UTOP but srcva is not mapped in the caller's
-//		address space.
-//	-E_INVAL if (perm & PTE_W), but srcva is read-only in the
-//		current environment's address space.
-//	-E_NO_MEM if there's not enough memory to map srcva in envid's
-//		address space.
+//  -E_BAD_ENV if environment envid doesn't currently exist.
+//    (No need to check permissions.)
+//  -E_IPC_NOT_RECV if envid is not currently blocked in sys_ipc_recv,
+//    or another environment managed to send first.
+//  -E_INVAL if srcva < UTOP but srcva is not page-aligned.
+//  -E_INVAL if srcva < UTOP and perm is inappropriate
+//    (see sys_page_alloc).
+//  -E_INVAL if srcva < UTOP but srcva is not mapped in the caller's
+//    address space.
+//  -E_INVAL if (perm & PTE_W), but srcva is read-only in the
+//    current environment's address space.
+//  -E_NO_MEM if there's not enough memory to map srcva in envid's
+//    address space.
 static int
 sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 {
@@ -401,7 +403,7 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 	int err;
 	err = envid2env(envid, &env, 0);
 	if (err) 
-	{	
+	{ 
 		return -E_BAD_ENV;
 	}
 	if (!env->env_ipc_recving) 
@@ -414,7 +416,7 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 		{
 				return -E_INVAL;
 		}
-		//	-E_INVAL if srcva < UTOP and perm is inappropriate
+		//  -E_INVAL if srcva < UTOP and perm is inappropriate
 		if ((perm & ~PTE_SYSCALL)) 
 		{
 			return -E_INVAL;
@@ -422,14 +424,14 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 		
 		pte_t *pte;
 		struct PageInfo *page = page_lookup(curenv->env_pgdir, srcva, &pte);
-		//	-E_INVAL if srcva < UTOP but srcva is not mapped in the caller's
-		//		address space.
+		//  -E_INVAL if srcva < UTOP but srcva is not mapped in the caller's
+		//    address space.
 		if (!page) 
 		{
 			return -E_INVAL;
 		}
-		//	-E_INVAL if (perm & PTE_W), but srcva is read-only in the
-		//		current environment's address space.
+		//  -E_INVAL if (perm & PTE_W), but srcva is read-only in the
+		//    current environment's address space.
 		if ((perm & PTE_W) && !(*pte & PTE_W))
 		{
 			return -E_INVAL;
@@ -469,7 +471,7 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 // This function only returns on error, but the system call will eventually
 // return 0 on success.
 // Return < 0 on error.  Errors are:
-//	-E_INVAL if dstva < UTOP but dstva is not page-aligned.
+//  -E_INVAL if dstva < UTOP but dstva is not page-aligned.
 static int
 sys_ipc_recv(void *dstva)
 {
@@ -505,6 +507,78 @@ sys_gettime(void)
 	//return 0;
 }
 
+//threads
+static int
+sys_pthread_create(uint32_t exit_adress, pthread *thread, const struct pthread_params *attr, void *(*start_routine)(void*), uint32_t arg)
+{
+	cprintf("pthread_create\n");
+
+	struct Env *newenv;
+
+	env_alloc(&newenv, curenv->env_id, 1, curenv);
+	cprintf("STILL ALIVE!\n");
+	// return 0;
+
+
+	newenv->env_tf.tf_eip = (uintptr_t) start_routine;
+
+	// if (attr == NULL) {
+	// newenv->priority = 1;
+	// newenv->sched_policy = SCHED_RR;
+	// newenv->pthread_type = JOINABLE;
+	// } else {
+	// newenv->priority = attr->priority;
+	// newenv->sched_policy = attr->sched_policy;
+	// if (attr->pthread_type == PTHREAD_CREATE_JOINABLE)
+	// 	newenv->pthread_type = JOINABLE;
+	// else if (attr->pthread_type == PTHREAD_CREATE_DETACHED)
+	// 	newenv->pthread_type = DETACHED;
+	// }
+	(*thread) = newenv->env_id;
+	uint32_t *curframe;
+
+	curframe = (uint32_t*)newenv->env_tf.tf_esp - 4;
+//  cprintf("STILL ALIVE!%p\n", (void*)curframe);
+	curframe[0] = exit_adress;
+//  cprintf("STILL ALIVE!%p\n", (void*)curframe);
+	curframe[1] = arg;
+	curframe[2] = 0;//(uint32_t)((uint32_t*)newenv->env_tf.tf_esp);
+	curframe[3] = 1;
+//  cprintf("!!%p!!\n", (void*)curframe[1]);
+	newenv->env_tf.tf_esp = (uintptr_t)((uint32_t*)(newenv->env_tf.tf_esp) - 4);
+//  cprintf("!!%p!!", (void*)newenv->env_tf.tf_esp);
+	// delete_from_queue(newenv);
+	// add_in_tail(newenv, 0);
+	newenv->env_status = ENV_RUNNABLE;
+	// sched_yield_from_clock();
+	sched_yield();
+	return 0;
+}
+static int
+sys_pthread_join(void)
+{
+	cprintf("pthread_create\n");
+	return 0;
+}
+static int
+sys_pthread_exit(void)
+{
+	cprintf("pthread_create\n");
+	return 0;
+}
+static int
+sys_sched_setparam(void)
+{
+	cprintf("pthread_create\n");
+	return 0;
+}
+static int
+sys_sched_setscheduler(void)
+{
+	cprintf("pthread_create\n");
+	return 0;
+}
+
 // Dispatches to the correct kernel function, passing the arguments.
 int32_t
 syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
@@ -533,7 +607,7 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 		break;
 	case SYS_page_map:
 		ret = sys_page_map((envid_t)a1, (void *)a2,
-						   (envid_t)a3, (void *)a4, (int)a5);
+							 (envid_t)a3, (void *)a4, (int)a5);
 		break;
 	case SYS_page_unmap:
 		ret = sys_page_unmap((envid_t)a1, (void *)a2);
@@ -554,17 +628,32 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 		sys_yield();
 		break;
 	// case SYS_phy_page:
-	// 	ret = sys_phy_page((envid_t)a1, (void *)a2);
-	// 	break;
+	//  ret = sys_phy_page((envid_t)a1, (void *)a2);
+	//  break;
 	case SYS_ipc_try_send:
 		ret = sys_ipc_try_send((envid_t)a1, (uint32_t)a2,
-							   (void *)a3, (int)a4);
+								 (void *)a3, (int)a4);
 		break;
 	case SYS_ipc_recv:
 		ret = sys_ipc_recv((void *)a1);
 		break;
 	case SYS_gettime:
 		ret = sys_gettime();
+		break;
+	case SYS_pthread_create:
+		ret = sys_pthread_create(NULL, (pthread*)a2, (const struct pthread_params*)a3, (void*(*)(void*)) a4, a5);
+		break;
+	case SYS_pthread_join:
+		ret = sys_pthread_join();
+		break;
+	case SYS_pthread_exit:
+		ret = sys_pthread_exit();
+		break;
+	case SYS_sched_setparam:
+		ret = sys_sched_setparam();
+		break;
+	case SYS_sched_setscheduler:
+		ret = sys_sched_setscheduler();
 		break;
 	default:
 		panic("syscall not implemented");
