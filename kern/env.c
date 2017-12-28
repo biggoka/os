@@ -289,13 +289,13 @@ env_alloc(struct Env **newenv_store, envid_t parent_id, int is_pthread, struct E
 	e->env_tf.tf_ss = GD_UD | 3;
 	if (!is_pthread)
 	{
-	e->env_tf.tf_esp = USTACKTOP;
+		e->env_tf.tf_esp = USTACKTOP;
 	}
 	else
 	{
 		//todo
 		//e->env_tf.tf_esp = get_stack_top();
-		e->env_tf.tf_esp = parent_env->env_tf.tf_esp;
+		e->env_tf.tf_esp = parent_env->env_tf.tf_esp - 4;
 	}
 	e->env_tf.tf_cs = GD_UT | 3;
 #endif
@@ -306,6 +306,9 @@ env_alloc(struct Env **newenv_store, envid_t parent_id, int is_pthread, struct E
 
 	// Clear the page fault handler until user installs one.
 	e->env_pgfault_upcall = 0;
+
+	// if (e->is_pthread)
+	// 	e->env_pgfault_upcall = parent_env->pgfault_upcall;
 
 	// Also clear the IPC receiving flag.
 	e->env_ipc_recving = 0;

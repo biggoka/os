@@ -516,42 +516,24 @@ sys_pthread_create(uint32_t exit_adress, pthread *thread, const struct pthread_p
 	struct Env *newenv;
 
 	env_alloc(&newenv, curenv->env_id, 1, curenv);
-	cprintf("STILL ALIVE!\n");
-	// return 0;
-
 
 	newenv->env_tf.tf_eip = (uintptr_t) start_routine;
 
-	// if (attr == NULL) {
-	// newenv->priority = 1;
-	// newenv->sched_policy = SCHED_RR;
-	// newenv->pthread_type = JOINABLE;
-	// } else {
-	// newenv->priority = attr->priority;
-	// newenv->sched_policy = attr->sched_policy;
-	// if (attr->pthread_type == PTHREAD_CREATE_JOINABLE)
-	// 	newenv->pthread_type = JOINABLE;
-	// else if (attr->pthread_type == PTHREAD_CREATE_DETACHED)
-	// 	newenv->pthread_type = DETACHED;
-	// }
-	(*thread) = newenv->env_id;
+	cprintf("pthread create yield\n");
+	// (*thread) = newenv->env_id;
+	cprintf("pthread create yield\n");
 	uint32_t *curframe;
 
 	curframe = (uint32_t*)newenv->env_tf.tf_esp - 4;
-//  cprintf("STILL ALIVE!%p\n", (void*)curframe);
-	curframe[0] = exit_adress;
-//  cprintf("STILL ALIVE!%p\n", (void*)curframe);
-	curframe[1] = arg;
-	curframe[2] = 0;//(uint32_t)((uint32_t*)newenv->env_tf.tf_esp);
+	curframe[0] = 0;
+	curframe[1] = 0;
+	curframe[2] = 0;
 	curframe[3] = 1;
-//  cprintf("!!%p!!\n", (void*)curframe[1]);
 	newenv->env_tf.tf_esp = (uintptr_t)((uint32_t*)(newenv->env_tf.tf_esp) - 4);
-//  cprintf("!!%p!!", (void*)newenv->env_tf.tf_esp);
-	// delete_from_queue(newenv);
-	// add_in_tail(newenv, 0);
 	newenv->env_status = ENV_RUNNABLE;
-	// sched_yield_from_clock();
-	sched_yield();
+
+
+	// sched_yield();
 	return 0;
 }
 static int

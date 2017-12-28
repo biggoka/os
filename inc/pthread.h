@@ -8,7 +8,7 @@ typedef uint32_t pthread;
 typedef struct pthread_params
 {
     int priority;
-    int sched_policy
+    int sched_policy;
 };
 
 enum
