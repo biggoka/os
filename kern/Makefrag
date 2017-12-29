@@ -101,6 +101,7 @@ KERN_BINFILES :=	user/hello \
 			user/date \
 			user/pthreadtest1 \
 			user/pthreadtest2 \
+			user/pthreadtest3 \
 			user/vdate
 KERN_BINFILES := $(patsubst %, $(OBJDIR)/%, $(KERN_BINFILES))
 endif

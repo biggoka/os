@@ -50,11 +50,6 @@ umain(int argc, char **argv)
 	sys_pthread_join(t2, &res);
 
 	cprintf("bot joins returned\n");
-	// int *res;
-	// cprintf("waiting for join\n");
-	// sys_pthread_join(t1, (void**)&res);
-	// assert(*res == 4242);
-	// cprintf("joined successfully, res is %d\n\n\n", *res);
 
 	// for(;;);
 }

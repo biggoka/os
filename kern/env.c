@@ -699,7 +699,7 @@ env_free(struct Env *e)
 				(envs[i].is_pthread) &&
 				(envs[i].pthread_type == JOINABLE || envs[i].pthread_type == DETACHED))
 			{
-				// par->waiting_for_children = 1;
+				par->waiting_for_children = 1;
 				// e->env_status = ENV_NOT_RUNNABLE;
 				// return 0;
 			}
