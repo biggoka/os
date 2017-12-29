@@ -140,13 +140,13 @@ int sys_pthread_join(pthread pthread, void ** res_ptr)
 {
 	return syscall(SYS_pthread_join, 0,(uint32_t)pthread,(uint32_t)res_ptr,0,0,0);
 }
-int sys_sched_setparam(void)
+int sys_sched_setparam(pthread pthread, struct pthread_params *params)
 {
-	return syscall(SYS_sched_setparam, 0,0,0,0,0,0);
+	return syscall(SYS_sched_setparam, 0,(uint32_t)pthread,(uint32_t)params,0,0,0);
 }
-int sys_sched_setscheduler(void)
+int sys_sched_setscheduler(pthread pthread, int policy)
 {
-	return syscall(SYS_sched_setscheduler, 0,0,0,0,0,0);
+	return syscall(SYS_sched_setscheduler, 0,(uint32_t)pthread,(uint32_t)policy,0,0,0);
 }
 int sys_print_pthread_info(pthread pthread)
 {

@@ -572,6 +572,24 @@ env_create(uint8_t *binary, size_t size, enum EnvType type)
 void
 env_free(struct Env *e)
 {
+	if (!e->is_pthread)
+	{
+		// int count = 0;
+		e->waiting_for_children = 0;
+		size_t i;
+		for (i = 0; i < NENV; i++)
+		{
+			if ((envs[i].parent_env == e) &&
+				(envs[i].env_status != ENV_FREE) &&
+				(envs[i].is_pthread) &&
+				(envs[i].pthread_type == JOINABLE || envs[i].pthread_type == DETACHED))
+			{
+				e->waiting_for_children = 1;
+				e->env_status = ENV_NOT_RUNNABLE;
+				return 0;
+			}
+		}
+	}
 #ifndef CONFIG_KSPACE
 	pte_t *pt;
 	uint32_t pdeno, pteno;
@@ -590,6 +608,7 @@ env_free(struct Env *e)
 #ifndef CONFIG_KSPACE
 	// Flush all mapped pages in the user portion of the address space
 	static_assert(UTOP % PTSIZE == 0);
+
 
 	if (!e->is_pthread)
 	{
@@ -669,6 +688,22 @@ env_free(struct Env *e)
 	if (e->is_pthread)
 	{
 		remove_from_wait_queue(e->env_id);
+		// env_free(e->parent_env);
+		struct Env *par = e->parent_env;
+		par->waiting_for_children = 0;
+		size_t i;
+		for (i = 0; i < NENV; i++)
+		{
+			if ((envs[i].parent_env == par) &&
+				(envs[i].env_status != ENV_FREE) &&
+				(envs[i].is_pthread) &&
+				(envs[i].pthread_type == JOINABLE || envs[i].pthread_type == DETACHED))
+			{
+				// par->waiting_for_children = 1;
+				// e->env_status = ENV_NOT_RUNNABLE;
+				// return 0;
+			}
+		}
 	}
 }
 

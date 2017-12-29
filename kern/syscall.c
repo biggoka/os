@@ -540,7 +540,7 @@ sys_pthread_exit(void *res)
 	cprintf("sys_pthread_exit\n");
 	curenv->res = res;
 	if (res)
-		cprintf("res of exit is %d\n", *(int*)res);
+		// cprintf("res of exit is %d\n", *(int*)res);
 
 	if (curenv->pthread_type != JOINABLE) 
 	{
@@ -556,7 +556,7 @@ sys_pthread_exit(void *res)
 		if ((**cur).wait_for == curenv->env_id) {
 			struct Env *tmp = *cur;
 			(*(**cur).putres) = res;
-			cprintf("putres = %d\n", *(int *)res);
+			// cprintf("putres = %d\n", *(int *)res);
 			(**cur).env_status = ENV_RUNNABLE;
 			*cur = (**cur).next_waiting_join;
 			tmp->next_waiting_join = NULL;
@@ -589,10 +589,10 @@ sys_pthread_create(uint32_t exit_adress, pthread *thread, const struct pthread_p
 	{
 		if (!((attr->pthread_type == PTHREAD_CREATE_JOINABLE) || (attr->pthread_type == PTHREAD_CREATE_DETACHED)))
 			return -1;
-		if (!((attr->priority >= MIN_PRIORITY) && (attr->priority <= MAX_PRIORITY)))
-			return -1;
-		if (!((attr->sched_policy == SCHED_RR) || (attr->sched_policy == SCHED_FIFO)))
-			return -1;
+		// if (!((attr->priority >= MIN_PRIORITY) && (attr->priority <= MAX_PRIORITY)))
+		// 	return -1;
+		// if (!((attr->sched_policy == SCHED_RR) || (attr->sched_policy == SCHED_FIFO)))
+		// 	return -1;
 	}
 
 	struct Env *newenv;
@@ -626,11 +626,11 @@ sys_pthread_create(uint32_t exit_adress, pthread *thread, const struct pthread_p
 	(*thread) = newenv->env_id;
 	uint32_t *curframe;
 
-	cprintf("ustacktop %u\n", USTACKTOP);
-	cprintf("esp %u\n", (uint32_t*)newenv->env_tf.tf_esp);
+	// cprintf("ustacktop %u\n", USTACKTOP);
+	// cprintf("esp %u\n", (uint32_t*)newenv->env_tf.tf_esp);
 	curframe = (uint32_t*)newenv->env_tf.tf_esp - 4;
 	curframe[0] = exit_adress;
-	cprintf("pthread create yield\n");
+	// cprintf("pthread create yield\n");
 	curframe[1] = arg;
 	curframe[2] = 0;
 	curframe[3] = 1;
@@ -700,15 +700,35 @@ sys_pthread_join(pthread pthread, void ** res_ptr)
 	return 0;
 }
 static int
-sys_sched_setparam(void)
+sys_sched_setparam(pthread pthread, struct pthread_params *params)
 {
-	cprintf("pthread_create\n");
+	cprintf("sys_sched_setparam\n");
+	size_t i;
+	for (i = 0; i < NENV; i++)
+	{
+		if ((envs[i].env_id == pthread) && (envs[i].env_status != ENV_FREE))
+		{
+			envs[i].pthread_type = params->pthread_type;
+			envs[i].priority = params->priority;
+			envs[i].sched_policy = params->sched_policy;
+			return 0;
+		}
+	}
 	return 0;
 }
 static int
-sys_sched_setscheduler(void)
+sys_sched_setscheduler(pthread pthread, int policy)
 {
-	cprintf("pthread_create\n");
+	cprintf("sys_sched_setscheduler\n");
+	size_t i;
+	for (i = 0; i < NENV; i++)
+	{
+		if ((envs[i].env_id == pthread) && (envs[i].env_status != ENV_FREE))
+		{
+			envs[i].sched_policy = policy;
+			return 0;
+		}
+	}
 	return 0;
 }
 static int
@@ -755,8 +775,7 @@ sys_print_pthread_info(pthread pthread)
 		}
 	}
 
-
-	cprintf("env not found%d\n", pthread);
+	cprintf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!env not found%d!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n", pthread);
 	return 0;
 }
 
@@ -831,10 +850,10 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 		ret = sys_pthread_exit((void*)a1);
 		break;
 	case SYS_sched_setparam:
-		ret = sys_sched_setparam();
+		ret = sys_sched_setparam((pthread)a1, (struct pthread_params *)a2);
 		break;
 	case SYS_sched_setscheduler:
-		ret = sys_sched_setscheduler();
+		ret = sys_sched_setscheduler((pthread)a1, (int)a2);
 		break;
 	case SYS_print_pthread_info:
 		ret = sys_print_pthread_info((pthread)a1);

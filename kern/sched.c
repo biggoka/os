@@ -171,6 +171,18 @@ sched_yield(void)
 	e = &envs[(curenv - envs + 1) % NENV];
 	while ((e != curenv) && (e->env_status != ENV_RUNNABLE))
 		e = &envs[(e - envs + 1) % NENV];
+
+	size_t i;
+	for (i = 0; i < NENV; i++)
+	{
+		if ((envs[i].waiting_for_children == 0) &&
+			envs[i].env_status == ENV_NOT_RUNNABLE &&
+			envs[i].is_pthread == 0)
+		{
+			env_free(&envs[i]);
+		}
+	}
+
 	if ((e->env_status == ENV_RUNNABLE) || (e->env_status == ENV_RUNNING))
 		env_run(e);
 	
