@@ -2,6 +2,7 @@
 
 #include <inc/syscall.h>
 #include <inc/lib.h>
+#include <inc/x86.h>
 
 static inline int32_t
 syscall(int num, int check, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
@@ -123,17 +124,21 @@ int sys_gettime(void)
 }
 
 //threads
+int sys_pthread_exit_help(void *res, int is_help)
+{
+	return syscall(SYS_pthread_exit, 0,is_help ? read_eax() : (uint32_t)res,0,0,0,0);
+}
+int sys_pthread_exit(void *res)
+{
+	return sys_pthread_exit_help(res, 0);
+}
 int sys_pthread_create(pthread *thread, const struct pthread_params *params, void *(*start_routine)(void*), uint32_t arg)
 {
-	return syscall(SYS_pthread_create, 0,0,(uint32_t)thread,(uint32_t)params,(uint32_t)start_routine,(uint32_t)arg);
+	return syscall(SYS_pthread_create, 0,(uint32_t)sys_pthread_exit_help,(uint32_t)thread,(uint32_t)params,(uint32_t)start_routine,(uint32_t)arg);
 }
-int sys_pthread_join(void)
+int sys_pthread_join(pthread pthread, void ** res_ptr)
 {
-	return syscall(SYS_pthread_join, 0,0,0,0,0,0);
-}
-int sys_pthread_exit(void)
-{
-	return syscall(SYS_pthread_exit, 0,0,0,0,0,0);
+	return syscall(SYS_pthread_join, 0,(uint32_t)pthread,(uint32_t)res_ptr,0,0,0);
 }
 int sys_sched_setparam(void)
 {
@@ -142,5 +147,9 @@ int sys_sched_setparam(void)
 int sys_sched_setscheduler(void)
 {
 	return syscall(SYS_sched_setscheduler, 0,0,0,0,0,0);
+}
+int sys_print_pthread_info(pthread pthread)
+{
+	return syscall(SYS_print_pthread_info, 0,(uint32_t)pthread,0,0,0,0);
 }
 

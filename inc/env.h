@@ -6,6 +6,7 @@
 #include <inc/types.h>
 #include <inc/trap.h>
 #include <inc/memlayout.h>
+#include <inc/pthread.h>
 
 typedef int32_t envid_t;
 
@@ -68,12 +69,24 @@ struct Env {
 
 	//threads
 	int is_pthread;
+	int pthreads_created;
 	int pthread_id;
 	struct Env *parent_env;
 	int sched_policy;
 	int pthread_type;
 	int priority;
+	void *res;
 	void **putres;
+
+	pthread wait_for;
+	struct Env *next_waiting_join;
+	int waiting_for_children;
+
+	struct Env *next_sched_queue;
+	int end_time;
+
+	uint32_t stacktop;
+	uint32_t pthread_stacktops[PTHREADS_MAX];
 
 
 };

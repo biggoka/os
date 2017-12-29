@@ -1,14 +1,15 @@
 #ifndef PTHREAD_H
 #define PTHREAD_H
 
-#define PTHREADS_MAX 10
+#define PTHREADS_MAX 5
 #define ERR_MAX_PTHREADS -123
 
 typedef uint32_t pthread;
-typedef struct pthread_params
+struct pthread_params
 {
     int priority;
     int sched_policy;
+    int pthread_type;
 };
 
 enum
@@ -21,9 +22,5 @@ enum
     DETACHED,
     JOINABLE_FINISHED,
 };
-
-
-
-
 
 #endif

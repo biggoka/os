@@ -14,6 +14,7 @@
 #include <kern/monitor.h>
 #include <kern/sched.h>
 #include <kern/cpu.h>
+#include <kern/syscall.h>
 
 #ifdef CONFIG_KSPACE
 struct Env env_array[NENV];
@@ -223,24 +224,54 @@ int
 env_alloc(struct Env **newenv_store, envid_t parent_id, int is_pthread, struct Env *parent_env)
 {
 	int32_t generation;
-	int r;
+	int r, i;
 	struct Env *e;
 
 	if (!(e = env_free_list)) {
 		return -E_NO_FREE_ENV;
 	}
 
+	if (is_pthread) {
+	  if (parent_env->pthreads_created == PTHREADS_MAX)
+	    return ERR_MAX_PTHREADS;
+	}
+
 	e->is_pthread = is_pthread;
+	e->parent_env = parent_env;
+	e->res = NULL;
+	e->putres= NULL;
+	e->wait_for = 0;
+	e->waiting_for_children = 0;
 
 	if (!is_pthread)
 	{
 		// Allocate and set up the page directory for this environment.
 		if ((r = env_setup_vm(e)) < 0)
-			return r;		
+			return r;	
+
+		e->pthreads_created = 0;
+		e->priority = 1;
+		e->sched_policy = SCHED_RR;
+		e->pthread_type = 0;
+		for (i = 0; i < PTHREADS_MAX; i++) {
+		  (e->pthread_stacktops)[i] = USTACKTOP - (i + 1) * PGSIZE;
+		  // uint32_t *t;
+		  // t = USTACKTOP - (i + 1) * PGSIZE;
+		  // t[0] = 0;
+		  // *(uint32_t *)((e->pthread_stacktops)[i]) = 0;
+		}	
 	}
 	else
 	{
-		e->parent_env = parent_env;
+		if (parent_env->is_pthread)
+		{
+			while (e->parent_env->is_pthread)
+				e->parent_env = e->parent_env->parent_env;
+		}
+
+		e->parent_env->pthreads_created += 1;
+
+		// e->parent_env = parent_env;
 		e->env_pgdir = parent_env->env_pgdir;
 	}
 
@@ -282,7 +313,7 @@ env_alloc(struct Env **newenv_store, envid_t parent_id, int is_pthread, struct E
 	e->env_tf.tf_cs = GD_KT | 0;
 	//LAB 3: Your code here.
 	// e->env_tf.tf_esp = 0x210000;
-	e->env_tf.tf_esp = 0x00210000 + 0x2000 * (e - envs);
+	e->env_tf.tf_esp = 0x00210000 + PGSIZE * (e - envs) * 2;
 #else
 	e->env_tf.tf_ds = GD_UD | 3;
 	e->env_tf.tf_es = GD_UD | 3;
@@ -293,9 +324,18 @@ env_alloc(struct Env **newenv_store, envid_t parent_id, int is_pthread, struct E
 	}
 	else
 	{
-		//todo
-		//e->env_tf.tf_esp = get_stack_top();
-		e->env_tf.tf_esp = parent_env->env_tf.tf_esp - 4;
+		size_t tmp;
+		for (tmp = 0; tmp < PTHREADS_MAX; tmp++)
+		{
+			if (e->parent_env->pthread_stacktops[tmp] != 0)
+			{
+				e->env_tf.tf_esp = e->parent_env->pthread_stacktops[tmp];
+				e->parent_env->pthread_stacktops[tmp] = 0;
+				break;
+			}
+		}
+		e->stacktop = e->env_tf.tf_esp;
+		// e->env_tf.tf_esp = parent_env->env_tf.tf_esp - 64;
 	}
 	e->env_tf.tf_cs = GD_UT | 3;
 #endif
@@ -317,7 +357,15 @@ env_alloc(struct Env **newenv_store, envid_t parent_id, int is_pthread, struct E
 	env_free_list = e->env_link;
 	*newenv_store = e;
 
-	cprintf("[%08x] new env %08x\n", curenv ? curenv->env_id : 0, e->env_id);
+	if (is_pthread)
+	{
+		cprintf("[%08x] new pthread %08x, parent %08x\n",
+			curenv ? curenv->env_id : 0, e->env_id, e->parent_env->env_id);
+	}
+	else
+	{
+		cprintf("[%08x] new env %08x\n", curenv ? curenv->env_id : 0, e->env_id);
+	}
 	return 0;
 }
 
@@ -489,7 +537,7 @@ load_icode(struct Env *e, uint8_t *binary, size_t size)
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
 	// LAB 8: Your code here.
-	region_alloc(e, (void *)(USTACKTOP - PGSIZE), PGSIZE);
+	region_alloc(e, (void *)(USTACKTOP - PGSIZE * (PTHREADS_MAX + 1)), PGSIZE * (PTHREADS_MAX + 1));
 }
 
 //
@@ -545,8 +593,16 @@ env_free(struct Env *e)
 
 	if (!e->is_pthread)
 	{
-		//todo
-		//delete all threads that are spawned by this process
+		size_t i;
+		for (i = 0; i < NENV; i++) 
+		{
+			if ((envs[i].env_status != ENV_FREE) && (envs[i].parent_env == e))
+			{
+				if (envs[i].pthread_type == JOINABLE)
+					env_free(&(envs[i]));
+				env_free(&(envs[i]));
+			}
+		}
 
 		for (pdeno = 0; pdeno < PDX(UTOP); pdeno++) {
 
@@ -568,17 +624,18 @@ env_free(struct Env *e)
 			e->env_pgdir[pdeno] = 0;
 			page_decref(pa2page(pa));
 		}
+		// free the page directory
+		pa = PADDR(e->env_pgdir);
+		e->env_pgdir = 0;
+		page_decref(pa2page(pa));
 	}
 	else
 	{
-		//
+		if ((e->pthread_type == DETACHED) || (e->pthread_type == JOINABLE_FINISHED))
+			e->parent_env->pthreads_created -= 1;
 	}
 
 
-	// free the page directory
-	pa = PADDR(e->env_pgdir);
-	e->env_pgdir = 0;
-	page_decref(pa2page(pa));
 #endif
 	// return the environment to the free list
 
@@ -588,11 +645,31 @@ env_free(struct Env *e)
 		e->env_link = env_free_list;
 		env_free_list = e;
 	}
+	else if ((e->pthread_type == DETACHED) || (e->pthread_type == JOINABLE_FINISHED))
+	{
+		size_t tmp;
+		for (tmp = 0; tmp < PTHREADS_MAX; tmp++)
+		{
+			if (e->parent_env->pthread_stacktops[tmp] == 0)
+			{
+				e->parent_env->pthread_stacktops[tmp] = e->stacktop;
+				break;
+			}
+		}
+		e->env_status = ENV_FREE;
+		e->env_link = env_free_list;
+		env_free_list = e;
+	}
 	else
 	{
-
+		e->pthread_type = JOINABLE_FINISHED;
+		e->env_status = ENV_NOT_RUNNABLE;
 	}
 
+	if (e->is_pthread)
+	{
+		remove_from_wait_queue(e->env_id);
+	}
 }
 
 //

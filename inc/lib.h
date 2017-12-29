@@ -22,6 +22,10 @@
 #include <inc/fd.h>
 #include <inc/args.h>
 #include <inc/pthread.h>
+#include <inc/malloc.h>
+// #include <stdlib.h>
+// #include <string.h>
+// #include <unistd.h>
 
 #define USED(x)		(void)(x)
 
@@ -63,10 +67,12 @@ int	sys_ipc_recv(void *rcv_pg);
 int sys_gettime(void);
 
 int sys_pthread_create(pthread *thread, const struct pthread_params *attr, void *(*start_routine)(void*), uint32_t arg);
-int sys_pthread_join(void);
-int sys_pthread_exit(void);
+int sys_pthread_join(pthread thread, void **res_ptr);
+int sys_pthread_exit(void *);
 int sys_sched_setparam(void);
 int sys_sched_setscheduler(void);
+
+int sys_print_pthread_info(pthread pthread);
 
 int vsys_gettime(void);
 
