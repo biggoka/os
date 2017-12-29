@@ -672,6 +672,9 @@ sys_pthread_join(pthread pthread, void ** res_ptr)
 		return -1;
 	// cprintf("i am here !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1\n");
 
+	if (t->pthread_type = DETACHED)
+		return -1;
+
 	if (t->pthread_type == JOINABLE_FINISHED)
 	{
 		*res_ptr = t->res;

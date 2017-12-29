@@ -19,7 +19,6 @@ umain(int argc, char **argv)
 	int arg1 = 1, arg2 = 2;
 
 	sys_pthread_create(&t1, NULL, &func1, (uint32_t)&arg1);
-	
 	sys_pthread_create(&t2, NULL, &func1, (uint32_t)&arg1);
 
 	int *res;
