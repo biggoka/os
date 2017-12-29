@@ -13,7 +13,7 @@ void *func1(void *a)
 		}
 		int *res = malloc(4);
 		*res = 4242;
-		if (i > 10)
+		if (i > 3)
 			return (void*)res;
 			// sys_pthread_exit((void*)res);
 		sys_yield();
@@ -74,11 +74,11 @@ umain(int argc, char **argv)
 	assert(*res == 4242 + 2);
 	cprintf("joined successfully, res is %d\n\n\n", *res);
 
-	cprintf("\n\nTesting join from thread with no join\n");
-	sys_pthread_create(&t1, &params, &func1, (uint32_t)&arg1);
-	sys_pthread_create(&t2, &params, &func3, (uint32_t)&t1);
-	sys_pthread_create(&t3, &params, &func1, (uint32_t)&arg1);
-	sys_pthread_create(&t4, &params, &func1, (uint32_t)&arg1);
+	// cprintf("\n\nTesting join from thread with no join\n");
+	// sys_pthread_create(&t1, &params, &func1, (uint32_t)&arg1);
+	// sys_pthread_create(&t2, &params, &func3, (uint32_t)&t1);
+	// sys_pthread_create(&t3, &params, &func1, (uint32_t)&arg1);
+	// sys_pthread_create(&t4, &params, &func1, (uint32_t)&arg1);
 
 	// for(;;);
 }

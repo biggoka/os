@@ -14,8 +14,6 @@ void *func2(void *a)
 	pthread t;
 	int arg = 4242;
 	sys_pthread_create(&t, NULL, &func1, (uint32_t)(&arg));
-
-
 	cprintf("end of thread 2\n");
 
 	// for (;;);
