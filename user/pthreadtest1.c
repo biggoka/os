@@ -10,7 +10,7 @@ void *func1(void *a)
 
 void *func2(void *a)
 {
-	cprintf("i will try to create pthread, and i amd pthread myself\n");
+	cprintf("i will try to create pthread, and i am pthread myself\n");
 	pthread t;
 	int arg = 4242;
 	sys_pthread_create(&t, NULL, &func1, (uint32_t)(&arg));
@@ -28,16 +28,9 @@ umain(int argc, char **argv)
 	pthread t1, t2;
 	int arg1 = 1, arg2 = 2;
 
-	struct pthread_params params;
-	params.priority = 2;
-	params.sched_policy = SCHED_RR;
-	params.pthread_type = PTHREAD_CREATE_JOINABLE;
-
 	cprintf("creating pthread from main\n");
-	sys_pthread_create(&t1, &params, &func1, (uint32_t)(&arg1));
+	sys_pthread_create(&t1, NULL, &func1, (uint32_t)(&arg1));
 
 	cprintf("try to create pthread from pthread\n");
-	sys_pthread_create(&t2, &params, &func2, (uint32_t)(&arg2));
-
-	// for (;;);
+	sys_pthread_create(&t2, NULL, &func2, (uint32_t)(&arg2));
 }

@@ -11,11 +11,13 @@ void *func1(void *a)
 		{
 			sys_print_pthread_info(-1);
 		}
-		int *res = malloc(4);
-		*res = 4242;
 		if (i > 3)
+		{
+			int *res = malloc(4);
+			*res = 4242;
 			return (void*)res;
-			// sys_pthread_exit((void*)res);
+			
+		}
 		sys_yield();
 	}
 	return NULL;
@@ -54,7 +56,7 @@ umain(int argc, char **argv)
 	int arg1 = 1;
 
 	struct pthread_params params;
-	params.priority = 2;
+	params.priority = 1;
 	params.sched_policy = SCHED_RR;
 	params.pthread_type = PTHREAD_CREATE_JOINABLE;
 
@@ -73,12 +75,4 @@ umain(int argc, char **argv)
 	sys_pthread_join(t2, (void**)&res);
 	assert(*res == 4242 + 2);
 	cprintf("joined successfully, res is %d\n\n\n", *res);
-
-	// cprintf("\n\nTesting join from thread with no join\n");
-	// sys_pthread_create(&t1, &params, &func1, (uint32_t)&arg1);
-	// sys_pthread_create(&t2, &params, &func3, (uint32_t)&t1);
-	// sys_pthread_create(&t3, &params, &func1, (uint32_t)&arg1);
-	// sys_pthread_create(&t4, &params, &func1, (uint32_t)&arg1);
-
-	// for(;;);
 }

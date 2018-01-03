@@ -555,13 +555,11 @@ sys_pthread_exit(void *res)
 	while (*cur) {
 		if ((**cur).wait_for == curenv->env_id) {
 			struct Env *tmp = *cur;
-			(*(**cur).putres) = res;
-			// cprintf("putres = %d\n", *(int *)res);
+			if ((**cur).putres)
+				(*(**cur).putres) = res;
 			(**cur).env_status = ENV_RUNNABLE;
 			*cur = (**cur).next_waiting_join;
 			tmp->next_waiting_join = NULL;
-			// delete_from_queue(tmp);
-			// add_in_tail(tmp, 0);
 			was_found = 1;
 		} else {
 			cur = &((**cur).next_waiting_join);
@@ -653,15 +651,9 @@ sys_pthread_join(pthread pthread, void ** res_ptr)
 	struct Env *t = NULL;
 	for (i = 0; i < NENV; i++)
 	{
-		// if (envs[i].env_id == pthread &&
-		// 	envs[i].env_status != ENV_FREE &&
-		// 	envs[i].is_pthread &&
-		// 	envs[i].parent_env == curenv->parent_env &&
-		// 	envs[i].pthread_type == DETACHED)
-		// {
-		// 	t = &(envs[i]);
-		// }
-		if (envs[i].env_id == pthread)
+		if (envs[i].env_id == pthread &&
+			envs[i].env_status != ENV_FREE &&
+			envs[i].is_pthread)
 		{
 			t = &(envs[i]);
 		}
@@ -669,15 +661,21 @@ sys_pthread_join(pthread pthread, void ** res_ptr)
 
 
 	if (!t)
+	{
+		cprintf("no target found\n");
 		return -1;
-	// cprintf("i am here !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1\n");
+	}
 
-	if (t->pthread_type = DETACHED)
+	if (t->pthread_type == DETACHED)
+	{
+		cprintf("trying to join detached pthread\n");
 		return -1;
+	}
 
 	if (t->pthread_type == JOINABLE_FINISHED)
 	{
-		*res_ptr = t->res;
+		if (res_ptr)
+			*res_ptr = t->res;
 		env_free(t);
 		return 0;
 	}
@@ -711,9 +709,13 @@ sys_sched_setparam(pthread pthread, struct pthread_params *params)
 	{
 		if ((envs[i].env_id == pthread) && (envs[i].env_status != ENV_FREE))
 		{
+			remove_from_queue(&envs[i]);
+
 			envs[i].pthread_type = params->pthread_type;
 			envs[i].priority = params->priority;
 			envs[i].sched_policy = params->sched_policy;
+
+			add_in_tail(&envs[i], 0);
 			return 0;
 		}
 	}
@@ -728,7 +730,11 @@ sys_sched_setscheduler(pthread pthread, int policy)
 	{
 		if ((envs[i].env_id == pthread) && (envs[i].env_status != ENV_FREE))
 		{
+			remove_from_queue(&envs[i]);
+
 			envs[i].sched_policy = policy;
+
+			add_in_tail(&envs[i], 0);
 			return 0;
 		}
 	}
@@ -750,11 +756,11 @@ sys_print_pthread_info(pthread pthread)
 			if (envs[i].is_pthread)
 			{
 				cprintf("Parent id is %08x\n", envs[i].parent_env->env_id);
-				cprintf("Thread type is: ");
+				cprintf("PThread type is: ");
 
 				if (envs[i].pthread_type == JOINABLE)
 				{
-					cprintf("JOINBABLE\n");
+					cprintf("JOINABLE\n");
 				}
 				else if (envs[i].pthread_type == DETACHED)
 				{

@@ -242,6 +242,8 @@ env_alloc(struct Env **newenv_store, envid_t parent_id, int is_pthread, struct E
 	e->putres= NULL;
 	e->wait_for = 0;
 	e->waiting_for_children = 0;
+	e->priority = 1;
+	e->sched_policy = SCHED_RR;
 
 	if (!is_pthread)
 	{
@@ -250,8 +252,6 @@ env_alloc(struct Env **newenv_store, envid_t parent_id, int is_pthread, struct E
 			return r;	
 
 		e->pthreads_created = 0;
-		e->priority = 1;
-		e->sched_policy = SCHED_RR;
 		e->pthread_type = 0;
 		for (i = 0; i < PTHREADS_MAX; i++) {
 		  (e->pthread_stacktops)[i] = USTACKTOP - (i + 1) * PGSIZE;
@@ -270,9 +270,7 @@ env_alloc(struct Env **newenv_store, envid_t parent_id, int is_pthread, struct E
 		}
 
 		e->parent_env->pthreads_created += 1;
-
-		// e->parent_env = parent_env;
-		e->env_pgdir = parent_env->env_pgdir;
+		e->env_pgdir = e->parent_env->env_pgdir;
 	}
 
 
@@ -366,6 +364,8 @@ env_alloc(struct Env **newenv_store, envid_t parent_id, int is_pthread, struct E
 	{
 		cprintf("[%08x] new env %08x\n", curenv ? curenv->env_id : 0, e->env_id);
 	}
+
+	add_in_head(e, 0);
 	return 0;
 }
 
@@ -553,7 +553,7 @@ env_create(uint8_t *binary, size_t size, enum EnvType type)
 	//LAB 3: Your code here.
 	int error;
 	struct Env *env_s;
-	error = env_alloc(&env_s,0, 0, NULL);
+	error = env_alloc(&env_s, 0, 0, NULL);
 	if (error) panic("env_alloc: %i", error);
 	env_s->env_type = type;
 	load_icode(env_s, binary, size);
@@ -579,12 +579,20 @@ env_free(struct Env *e)
 		size_t i;
 		for (i = 0; i < NENV; i++)
 		{
+			// if ((envs[i].parent_env == e) &&
+			// 	(envs[i].env_status != ENV_FREE) &&
+			// 	(envs[i].is_pthread) &&
+			// 	(envs[i].pthread_type == JOINABLE || envs[i].pthread_type == DETACHED))
+			// {
+			// 	e->waiting_for_children = 1;
+			// 	e->env_status = ENV_NOT_RUNNABLE;
+			// 	return 0;
+			// }
+
 			if ((envs[i].parent_env == e) &&
-				(envs[i].env_status != ENV_FREE) &&
-				(envs[i].is_pthread) &&
-				(envs[i].pthread_type == JOINABLE || envs[i].pthread_type == DETACHED))
+				!(envs[i].env_status == ENV_FREE || envs[i].env_status == ENV_NOT_RUNNABLE) &&
+				(envs[i].is_pthread == 1))
 			{
-				e->waiting_for_children = 1;
 				e->env_status = ENV_NOT_RUNNABLE;
 				return 0;
 			}
@@ -690,21 +698,24 @@ env_free(struct Env *e)
 		remove_from_wait_queue(e->env_id);
 		// env_free(e->parent_env);
 		struct Env *par = e->parent_env;
-		par->waiting_for_children = 0;
-		size_t i;
-		for (i = 0; i < NENV; i++)
-		{
-			if ((envs[i].parent_env == par) &&
-				(envs[i].env_status != ENV_FREE) &&
-				(envs[i].is_pthread) &&
-				(envs[i].pthread_type == JOINABLE || envs[i].pthread_type == DETACHED))
-			{
-				par->waiting_for_children = 1;
-				// e->env_status = ENV_NOT_RUNNABLE;
-				// return 0;
-			}
-		}
+		// env_free(par);
+		// par->waiting_for_children = 0;
+		// size_t i;
+		// for (i = 0; i < NENV; i++)
+		// {
+		// 	if ((envs[i].parent_env == par) &&
+		// 		(envs[i].env_status != ENV_FREE) &&
+		// 		(envs[i].is_pthread) &&
+		// 		(envs[i].pthread_type == JOINABLE || envs[i].pthread_type == DETACHED))
+		// 	{
+		// 		// par->waiting_for_children = 1;
+		// 		// e->env_status = ENV_NOT_RUNNABLE;
+		// 		// return 0;
+		// 	}
+		// }
 	}
+
+	// remove_from_queue(e);
 }
 
 //
