@@ -709,13 +709,24 @@ sys_sched_setparam(pthread pthread, struct pthread_params *params)
 	{
 		if ((envs[i].env_id == pthread) && (envs[i].env_status != ENV_FREE))
 		{
-			remove_from_queue(&envs[i]);
+			// remove_from_queue(&envs[i]);
+			int old_priority = envs[i].priority;
+			int new_priority = params->priority;
+
+			if (new_priority != old_priority)
+				remove_from_queue(&envs[i]);
 
 			envs[i].pthread_type = params->pthread_type;
 			envs[i].priority = params->priority;
 			envs[i].sched_policy = params->sched_policy;
 
-			add_in_tail(&envs[i], 0);
+			if (new_priority > old_priority)
+				add_in_tail(&envs[i], 0);
+			else if (new_priority < old_priority)
+				add_in_head(&envs[i], 0);
+
+
+
 			return 0;
 		}
 	}
