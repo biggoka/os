@@ -227,7 +227,13 @@ void sched_yield(void)
 		}
 		else
 		{
-			add_in_head(curenv, gettime() + time_left);
+			// add_in_head(curenv, gettime() + time_left);
+		}
+
+		if (curenv->sched_policy == SCHED_FIFO &&
+			(curenv->env_status == ENV_RUNNING || curenv->env_status == ENV_RUNNABLE))
+		{
+			add_in_tail(curenv, gettime() + time_left);
 		}
 
 		find_and_run();
