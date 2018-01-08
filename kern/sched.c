@@ -223,7 +223,7 @@ void sched_yield(void)
 		int time_left = curenv->end_time - gettime();
 		if (time_left <= 0 && curenv->sched_policy == SCHED_RR)
 		{
-			add_in_tail(curenv, gettime + TIME_QUANT);
+			add_in_tail(curenv, gettime() + TIME_QUANT);
 		}
 		else
 		{
@@ -233,7 +233,7 @@ void sched_yield(void)
 		if (curenv->sched_policy == SCHED_FIFO &&
 			(curenv->env_status == ENV_RUNNING || curenv->env_status == ENV_RUNNABLE))
 		{
-			add_in_tail(curenv, gettime() + time_left);
+			add_in_tail(curenv, 0);
 		}
 
 		find_and_run();

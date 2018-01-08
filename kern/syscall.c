@@ -639,7 +639,8 @@ sys_pthread_create(uint32_t exit_adress, pthread *thread, const struct pthread_p
 	add_in_tail(newenv, 0);
 
 
-	sched_yield();
+	if (curenv->sched_policy != SCHED_FIFO)
+		sched_yield();
 	return 0;
 }
 static int
