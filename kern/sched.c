@@ -8,6 +8,7 @@
 
 struct Taskstate cpu_ts;
 void sched_halt(void);
+int by_time = 0;
 
 struct Env *queues[MAX_PRIORITY];
 
@@ -78,20 +79,6 @@ void remove_from_queue(struct Env *env)
 	if (!present_in_queues(env))
 		return;
 
-	// struct Env **cur = &(queues[env->priority]);
-	// while ((**cur).next_sched_queue)
-	// {
-	// 	if ((**cur).next_sched_queue->env_id == env->env_id)
-	// 	{
-	// 		(**cur).next_sched_queue = (**cur).next_sched_queue->next_sched_queue;
-	// 		return;
-	// 	}
-	// 	else
-	// 	{
-	// 		*cur = (**cur).next_sched_queue;
-	// 	}
-	// }
-
 	struct Env *cur = queues[env->priority];
 	if (cur->env_id == env->env_id)
 	{
@@ -119,33 +106,7 @@ void remove_from_queue(struct Env *env)
 void find_and_run(void)
 {
 	// cprintf("find and run\n");
-	// int pr;
-	// for (pr = MAX_PRIORITY-1; pr >= MIN_PRIORITY; pr--)
-	// {
-	// 	struct Env *tmp;
-	// 	while (queues[pr])
-	// 	{
-	// 		tmp = queues[pr];
-	// 		queues[pr] = tmp->next_sched_queue;
 
-	// 		if (tmp->env_status == ENV_RUNNABLE)
-	// 		{
-	// 			// if (tmp->end_time == 0 && curenv->sched_policy == SCHED_RR)
-	// 			// {
-	// 			// 	tmp->end_time = TIME_QUANT;	
-	// 			// }
-	// 			// tmp->end_time += gettime();
-	// 			// tmp->next_sched_queue = NULL;
-	// 			if (!curenv)
-	// 				curenv = tmp;
-	// 			env_run(tmp);
-	// 		}
-	// 		else
-	// 		{
-	// 			// tmp->next_sched_queue = NULL;
-	// 		}
-	// 	}
-	// }
 
 	// cprintf("no env to run\n");
 
@@ -203,7 +164,8 @@ int present_in_queues(struct Env *env)
 void sched_yield_by_time(void)
 {
 	cprintf("sched_yield_by_time\n");
-	add_in_head(curenv, -1);
+	// add_in_head(curenv, -1);
+	by_time = 1;
 	sched_yield();
 }
 
@@ -244,8 +206,14 @@ void sched_yield(void)
 		if (curenv->sched_policy == SCHED_FIFO &&
 			(curenv->env_status == ENV_RUNNING || curenv->env_status == ENV_RUNNABLE))
 		{
-			env_run(curenv);
+			if (by_time == 1)
+			{
+				by_time = 0;
+				env_run(curenv);
+			}
 		}
+
+		by_time = 0;
 
 		add_in_head(curenv, 0);
 
@@ -259,11 +227,13 @@ void sched_yield(void)
 		}
 		else
 		{
-			// add_in_head(curenv, gettime() + time_left);
+			add_in_head(curenv, gettime() + time_left);
 		}
 
 		find_and_run();
 	}
+
+	by_time = 0;
 
 	size_t i;
 	for (i = 0; i < NENV; i++)

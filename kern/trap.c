@@ -307,7 +307,7 @@ trap(struct Trapframe *tf)
 	if (curenv->env_status == ENV_DYING) {
 		env_free(curenv);
 		curenv = NULL;
-		sched_yield();
+		sched_yield_by_time();
 	}
 
 	// Copy trap frame (which is currently on the stack)
